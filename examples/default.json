@@ -1,0 +1,141 @@
+{
+  "format": 1,
+  "active": 0,
+  "profiles": [
+    {
+      "name": "media",
+      "dwell_ms": 1000,
+      "tap_max_ms": 250,
+      "overflow": "wrap",
+      "ext_count": 8,
+      "brightness": 64,
+      "idle_mode": "breathe",
+      "idle_color": "#001018",
+      "tap": {
+        "color": "#FFFFFF",
+        "steps": [
+          {
+            "consumer": "PLAY_PAUSE"
+          }
+        ]
+      },
+      "slots": [
+        {
+          "color": "#FF0000",
+          "steps": [
+            {
+              "consumer": "MUTE"
+            }
+          ]
+        },
+        {
+          "color": "#FF6000",
+          "steps": [
+            {
+              "consumer": "VOLUME_DECREMENT"
+            }
+          ]
+        },
+        {
+          "color": "#FFC000",
+          "steps": [
+            {
+              "consumer": "VOLUME_INCREMENT"
+            }
+          ]
+        },
+        {
+          "color": "#00FF00",
+          "steps": [
+            {
+              "consumer": "SCAN_PREVIOUS_TRACK"
+            }
+          ]
+        },
+        {
+          "color": "#0060FF",
+          "steps": [
+            {
+              "consumer": "SCAN_NEXT_TRACK"
+            }
+          ]
+        },
+        {
+          "color": "#8000FF",
+          "steps": [
+            {
+              "key": "ESCAPE"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "text",
+      "dwell_ms": 1000,
+      "tap_max_ms": 250,
+      "overflow": "wrap_cancel",
+      "ext_count": 8,
+      "brightness": 64,
+      "idle_mode": "solid",
+      "idle_color": "#080808",
+      "tap": {
+        "color": "#FFFFFF",
+        "steps": [
+          {
+            "text": "Acknowledged."
+          }
+        ]
+      },
+      "slots": [
+        {
+          "color": "#FF0000",
+          "steps": [
+            {
+              "text": "On my way."
+            }
+          ]
+        },
+        {
+          "color": "#00FF00",
+          "steps": [
+            {
+              "text": "Looks good to me."
+            }
+          ]
+        },
+        {
+          "color": "#0060FF",
+          "steps": [
+            {
+              "key": "A",
+              "mods": [
+                "CTRL"
+              ]
+            },
+            {
+              "key": "C",
+              "mods": [
+                "CTRL"
+              ]
+            }
+          ]
+        },
+        {
+          "color": "#FFC000",
+          "steps": [
+            {
+              "text": "brb"
+            },
+            {
+              "delay_ms": 200
+            },
+            {
+              "key": "ENTER"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

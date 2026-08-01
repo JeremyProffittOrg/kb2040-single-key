@@ -1,0 +1,19 @@
+# CircuitPython libraries are installed with circup, not vendored
+src/lib/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Go
+/cli/kb2040ctl
+/cli/kb2040ctl.exe
+/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
