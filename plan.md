@@ -320,3 +320,44 @@ verification actually returned.
   tension flagged at plan time is not binding in practice — there is room for roughly 8
   profiles of this size.
 
+### 2026-08-01 — WS-B complete (device firmware, host side)
+
+- `src/singlekey/`: `a85`, `blob`, `nvmstore`, `colortap`, `leds`, `actions`, `protocol`,
+  `ticks`. `src/boot.py` (dual CDC + HID device selection) and `src/code.py` (Device,
+  KeyReader, SerialLines, main loop) are the only hardware-touching modules.
+- `python -m pytest tests -q` → **137 passed**. Includes both cross-language golden vectors
+  (`tests/fixtures/default.bin`, `tests/fixtures/default.a85`), a third-implementation
+  cross-check against CPython's `base64.a85encode`, and a structural test asserting no
+  module under `src/singlekey` imports CircuitPython.
+- Format change during implementation: added `blob_len` (u16 at offset 8) so a blob is
+  self-delimiting. The firmware is handed the whole 4096-byte NVM region and must find the
+  end of the blob before it can verify the CRC that sits there. `docs/format.md` and the
+  fixtures were regenerated together.
+- Protocol change during implementation: dropped the `.` transfer terminator. Every
+  candidate terminator character is itself legal Ascii85 and a final line can be a single
+  character, so a terminator is genuinely ambiguous. Instead the encoder never emits the
+  `z` shorthand, which makes `encoded_len(n)` exact, and the device frames an upload by
+  counting characters. A 5-second silence timeout stops an abandoned upload wedging the port.
+- Gotcha recorded: `src/` must be **appended** to `sys.path`, never prepended — CircuitPython
+  requires the entry point to be `code.py`, which shadows the stdlib `code` module that pdb
+  imports, and pytest fails to start.
+
+### 2026-08-01 — WS-C complete (Go CLI)
+
+- `cli/cmd/kb2040ctl` (13 commands) plus `internal/device` (serial transport, handshake
+  autodetect, upload framing) and `internal/patch` (dotted-path edits).
+- Dependency: `go.bug.st/serial v1.8.0`.
+- `go vet ./...` clean; `go test ./...` passes. The device client is tested against
+  `internal/device/fake_test.go`, an independent in-memory implementation of the protocol,
+  covering upload framing, EV-line interleaving, ERR handling and command timeouts.
+- Bug found and fixed by that suite: `wire.Decode` sized its output buffer at `len*4/5`,
+  but a `z` shortcut expands one character to four bytes, so `z`-containing input was
+  silently truncated. Now `4*len+4`.
+- macOS note: `go.bug.st/serial/enumerator` needs cgo (IOKit). Rather than force a
+  multi-runner release matrix, `ports_detailed.go` / `ports_basic.go` are build-tagged, so
+  cgo-less darwin builds fall back to port names only. Autodetect identifies the board by
+  protocol handshake either way.
+- **Verified: all six targets build with `CGO_ENABLED=0`** (windows/linux/darwin ×
+  amd64/arm64). `kb2040ctl validate examples/default.json` exits 0 and reports
+  `183 / 4096 bytes (3913 free)`.
+

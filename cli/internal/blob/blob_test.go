@@ -312,8 +312,8 @@ func reseal(b []byte) []byte {
 
 func TestJSONRejectsAmbiguousStep(t *testing.T) {
 	cases := map[string]string{
-		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[{"key":"A","text":"hi"}]},"slots":[]}`: "exactly one thing",
-		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[{}]},"slots":[]}`:                      "none of",
+		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[{"key":"A","text":"hi"}]},"slots":[]}`:       "exactly one thing",
+		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[{}]},"slots":[]}`:                            "none of",
 		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[{"text":"hi","mods":["CTRL"]}]},"slots":[]}`: "mods only apply",
 		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"sideways","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"#000000","tap":{"color":"#000000","steps":[]},"slots":[]}`:                          "overflow",
 		`{"name":"x","dwell_ms":1000,"tap_max_ms":250,"overflow":"wrap","ext_count":0,"brightness":10,"idle_mode":"off","idle_color":"nope","tap":{"color":"#000000","steps":[]},"slots":[]}`:                                 "colour",

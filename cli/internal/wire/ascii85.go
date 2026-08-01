@@ -55,7 +55,12 @@ func EncodeLines(data []byte) []string {
 // Decode parses Ascii85, ignoring any whitespace introduced by line wrapping.
 func Decode(s string) ([]byte, error) {
 	src := []byte(s)
-	dst := make([]byte, len(src)*4/5+4)
+	// Four bytes per input character is the real upper bound, not the 4/5 ratio of the
+	// dense encoding: a `z` shortcut turns one character into four bytes. Our own encoder
+	// never emits `z`, but Decode accepts input from any encoder, and ascii85.Decode fills
+	// what it is given and stops rather than reporting a short buffer -- so undersizing
+	// here truncates silently.
+	dst := make([]byte, 4*len(src)+4)
 	ndst, _, err := ascii85.Decode(dst, src, true)
 	if err != nil {
 		return nil, fmt.Errorf("ascii85: %w", err)
