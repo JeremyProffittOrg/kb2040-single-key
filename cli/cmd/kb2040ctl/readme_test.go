@@ -79,3 +79,48 @@ func TestEveryCommandHasASummary(t *testing.T) {
 
 // escapePipes accounts for markdown tables needing a literal | escaped as \|.
 func escapePipes(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
+
+// manualSection returns the manual's "# Commands" chapter.
+func manualCommands(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "docs", "manual.md"))
+	if err != nil {
+		t.Fatalf("reading docs/manual.md: %v", err)
+	}
+	text := string(data)
+	start := strings.Index(text, "\n# Commands\n")
+	if start < 0 {
+		t.Fatal("docs/manual.md has no '# Commands' chapter")
+	}
+	rest := text[start+len("\n# Commands\n"):]
+	if end := strings.Index(rest, "\n# "); end >= 0 {
+		return rest[:end]
+	}
+	return rest
+}
+
+// TestManualDocumentsEveryCommand keeps the PDF manual honest. It is built from
+// docs/manual.md by scripts/build-manual.py, so a command added to the CLI without a
+// section here would ship a manual that silently omits it.
+func TestManualDocumentsEveryCommand(t *testing.T) {
+	manual := manualCommands(t)
+	for _, c := range commands {
+		if !strings.Contains(manual, "\n## "+c.name+"\n") {
+			t.Errorf("docs/manual.md has no '## %s' section", c.name)
+		}
+	}
+}
+
+func TestManualDocumentsNothingExtra(t *testing.T) {
+	known := map[string]bool{}
+	for _, c := range commands {
+		known[c.name] = true
+	}
+	for _, line := range strings.Split(manualCommands(t), "\n") {
+		if name, ok := strings.CutPrefix(line, "## "); ok {
+			if name = strings.TrimSpace(name); !known[name] {
+				t.Errorf("docs/manual.md documents %q, which is not a command", name)
+			}
+		}
+	}
+}

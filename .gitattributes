@@ -7,3 +7,6 @@ tests/fixtures/default.bin binary
 tests/fixtures/default.a85 text eol=lf
 
 *.ps1 text eol=crlf
+
+# Generated PDF: committed as a deliverable, rebuilt by scripts/build-manual.py
+docs/kb2040ctl-manual.pdf binary

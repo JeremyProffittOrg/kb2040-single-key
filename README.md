@@ -7,6 +7,9 @@ and a few WS2812 RGB LEDs, which enumerates as a USB keyboard **and** a second U
 port used only for configuration. Configuration lives on the board, survives a power cycle,
 and is edited with a cross-platform CLI.
 
+Verified on an Adafruit KB2040 running **CircuitPython 10.2.1**, with an eight-pixel WS2812B
+chain. A full command reference is in [`docs/kb2040ctl-manual.pdf`](docs/kb2040ctl-manual.pdf).
+
 ---
 
 ## The colour tap
@@ -127,9 +130,24 @@ To use different pins, change `KEY_PIN` and `EXT_PIN` at the top of `src/code.py
 
 ### 1. Put CircuitPython on the board
 
-Download the [KB2040 CircuitPython build](https://circuitpython.org/board/adafruit_kb2040/),
-double-tap reset to get the `RPI-RP2` drive, and copy the `.uf2` onto it. The board reboots
-as a `CIRCUITPY` drive.
+Skip this if the board already shows up as a `CIRCUITPY` drive.
+
+Get it into the UF2 bootloader so an `RPI-RP2` drive appears:
+
+- **double-tap RESET** quickly, or
+- **hold BOOT while tapping RESET** (or while plugging the USB cable in), or
+- if the board is running an **Arduino** sketch, the double-tap often does nothing — use the
+  standard Arduino *1200-baud touch* instead: open its serial port at 1200 baud and close
+  it, and it reboots into the bootloader.
+
+Then copy the [KB2040 CircuitPython build](https://circuitpython.org/board/adafruit_kb2040/)
+onto `RPI-RP2`. The board reboots as `CIRCUITPY`.
+
+> **Get the board-specific build.** Nothing on the bootloader drive identifies the board —
+> `INFO_UF2.TXT` always reads `Model: Raspberry Pi RP2`, because the bootloader lives in the
+> RP2040's mask ROM and is identical on every RP2040. The `.uf2` is what defines
+> `board.NEOPIXEL`, `board.D4` and `board.D10`, so the wrong one breaks exactly the pins this
+> firmware uses. Once CircuitPython is on, `boot_out.txt` names the board for real.
 
 ### 2. Flash the firmware
 
@@ -162,11 +180,12 @@ arm64, no runtime to install.
 
 ```console
 $ kb2040ctl ports
--> COM7         KB2040 Single Key  [USB 239A:8106]
-   COM6         KB2040 Single Key  [USB 239A:8106]
+   COM27        USB Serial Device (COM27)  [USB 239A:8106]
+-> COM28        USB Serial Device (COM28)  [USB 239A:8106]
+   COM3         Standard Serial over Bluetooth link (COM3)
 
 $ kb2040ctl info
-port       COM7
+port       COM28
 firmware   0.1.0 (format 1)
 storage    204 / 4096 bytes used (3892 free)
 
@@ -176,6 +195,7 @@ storage    204 / 4096 bytes used (3892 free)
 
 Two ports appear because the board exposes both the REPL console and the config port. They
 have identical USB IDs, so `kb2040ctl` finds the right one by asking each until one answers.
+Only USB ports are probed — opening an idle Bluetooth serial port can block for minutes.
 
 ---
 
@@ -320,6 +340,11 @@ Close it and try again, or pass `-port` explicitly.
 stored configuration and fell back to the factory defaults; the status says why (`blank` on
 a board that has never been configured, `corrupt: ...` otherwise). Uploading a configuration
 clears it.
+
+**No `CIRCUITPY` drive at all.** The board is not running CircuitPython — it may still have
+whatever firmware came on it. Go back to step 1. A board running an Arduino sketch enumerates
+as a single serial port with no drive, and its USB vendor ID is `2E8A` (Raspberry Pi) rather
+than Adafruit's `239A`.
 
 **No startup rainbow at all.** The firmware is not running. Check the REPL on the *console*
 serial port for a traceback — a missing library (`adafruit_hid`, `neopixel`) is the usual

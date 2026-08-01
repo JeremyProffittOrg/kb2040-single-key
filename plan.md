@@ -472,3 +472,22 @@ per LED in the default chain, in the same order the startup sweep paints them. P
 `media` keeps play/pause plus volume and track controls, and carries the delay step that
 keeps the cross-language golden vector covering all four step types. 204 / 4096 bytes.
 
+### 2026-08-01 — confirmed working by the operator; docs + CLI manual
+
+- Operator confirmed the device works on hardware. Task 7 closed.
+- `README.md` corrected against what actually happened during bring-up: bootloader entry now
+  lists the 1200-baud touch (double-tap RESET did nothing on a board running Arduino), a
+  warning that `INFO_UF2.TXT` cannot identify an RP2040 board, real `ports`/`info` output
+  rather than idealised output, and a troubleshooting entry for a board with no CIRCUITPY
+  drive. Added the "Out of the box" table for the `colors` profile.
+- `docs/manual.md` — 13-page CLI reference: the colour-tap model, finding the board, exit
+  status, every command with flags and examples, the configuration schema, the byte budget,
+  and troubleshooting.
+- `scripts/build-manual.py` renders it to `docs/kb2040ctl-manual.pdf` (pandoc + WeasyPrint,
+  print CSS inline in the script). Committed both the source and the PDF; regenerate with
+  `python scripts/build-manual.py`.
+- Two new tests assert `docs/manual.md` documents exactly the CLI's registered commands, in
+  both directions — matching the existing README guard, so a new command cannot ship with a
+  manual that silently omits it.
+- PDF emailed to the operator via SES from an `@jeremy.ninja` sender.
+
