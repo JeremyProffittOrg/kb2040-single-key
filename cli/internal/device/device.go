@@ -26,6 +26,9 @@ const AdafruitVID = "239A"
 // DefaultTimeout bounds a single command. Uploads get their own, longer budget.
 const DefaultTimeout = 3 * time.Second
 
+// drainWindow bounds how long resynchronisation will spend swallowing stale output.
+const drainWindow = 500 * time.Millisecond
+
 // Conn is an open connection to a board.
 //
 // The transport is an io.ReadWriteCloser rather than a serial.Port so the protocol client
@@ -111,6 +114,12 @@ func Autodetect() (*Conn, error) {
 
 	var tried []string
 	for _, p := range ports {
+		// Never open a non-USB port. The board is always USB CDC, and opening an idle
+		// Bluetooth serial port can block for minutes -- probing them turned autodetect
+		// into a hang. Skipped only where the platform actually reports USB metadata.
+		if portsHaveUSBMetadata && !p.IsUSB {
+			continue
+		}
 		tried = append(tried, p.Name)
 		c, err := open(p.Name)
 		if err != nil {
@@ -145,10 +154,28 @@ func (c *Conn) Command(line string) ([]string, error) {
 }
 
 func (c *Conn) commandTimeout(line string, timeout time.Duration) ([]string, error) {
+	// Resynchronise first. Every command has exactly one terminating line, so a client that
+	// starts reading part-way through some earlier command's reply stays wrong for the rest
+	// of the session -- which is exactly what happens when a previous run was interrupted
+	// and left an unread response sitting in the port's buffer.
+	c.Drain(drainWindow)
 	if err := c.writeLine(line); err != nil {
 		return nil, err
 	}
 	return c.readResponse(timeout)
+}
+
+// Drain discards anything already waiting to be read, plus whatever arrives while the port
+// stays busy, up to window. Cheap when the port is idle: the first read comes back empty.
+func (c *Conn) Drain(window time.Duration) {
+	c.buf = c.buf[:0]
+	deadline := time.Now().Add(window)
+	for time.Now().Before(deadline) {
+		n, err := c.rw.Read(c.scratch)
+		if err != nil || n == 0 {
+			return
+		}
+	}
 }
 
 // readResponse collects lines until the single terminating OK/ERR. EV lines are skipped:

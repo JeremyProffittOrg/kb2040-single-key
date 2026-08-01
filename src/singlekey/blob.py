@@ -392,10 +392,8 @@ def _u16(v):
 
 # HID usage IDs for the handful of keys and media codes the factory defaults use. The full
 # name tables live in the Go CLI; the device only ever deals in numbers.
-_KEY_A = 4
-_KEY_C = 6
-_KEY_ENTER = 40
-_KEY_ESCAPE = 41
+_KEY_V = 25
+_KEY_PRINT_SCREEN = 70
 _MOD_CTRL = 0x01
 
 _CC_SCAN_NEXT = 0xB5
@@ -411,12 +409,30 @@ def default_config():
 
     This must encode to exactly the bytes Go's ``blob.DefaultConfig()`` produces --
     ``tests/fixtures/default.bin`` is the check. Change one side and the tests fail.
+
+    Profile 0 is deliberately self-describing: a tap takes a screenshot, and every colour
+    slot types the name of the colour it is showing, so the gesture teaches itself.
     """
     return Config(
         active=0,
         profiles=[
             Profile(
-                "media", 1000, 250, OVERFLOW_WRAP, 8, 64, IDLE_BREATHE, (0x00, 0x10, 0x18),
+                "colors", 1000, 250, OVERFLOW_WRAP, 8, 64, IDLE_BREATHE, (0x00, 0x10, 0x18),
+                Binding((0xFF, 0xFF, 0xFF), [Step(STEP_KEY, keycode=_KEY_PRINT_SCREEN)]),
+                # One slot per LED in the default eight-pixel chain, in wheel order.
+                [
+                    Binding((0xFF, 0x00, 0x00), [Step(STEP_TEXT, text="Red")]),
+                    Binding((0xFF, 0x60, 0x00), [Step(STEP_TEXT, text="Orange")]),
+                    Binding((0xFF, 0xC0, 0x00), [Step(STEP_TEXT, text="Yellow")]),
+                    Binding((0x00, 0xFF, 0x00), [Step(STEP_TEXT, text="Green")]),
+                    Binding((0x00, 0xFF, 0xFF), [Step(STEP_TEXT, text="Cyan")]),
+                    Binding((0x00, 0x00, 0xFF), [Step(STEP_TEXT, text="Blue")]),
+                    Binding((0x80, 0x00, 0xFF), [Step(STEP_TEXT, text="Violet")]),
+                    Binding((0xFF, 0x00, 0xFF), [Step(STEP_TEXT, text="Magenta")]),
+                ],
+            ),
+            Profile(
+                "media", 1000, 250, OVERFLOW_WRAP_CANCEL, 8, 64, IDLE_SOLID, (0x08, 0x08, 0x08),
                 Binding((0xFF, 0xFF, 0xFF), [Step(STEP_CONSUMER, consumer=_CC_PLAY_PAUSE)]),
                 [
                     Binding((0xFF, 0x00, 0x00), [Step(STEP_CONSUMER, consumer=_CC_MUTE)]),
@@ -424,23 +440,12 @@ def default_config():
                     Binding((0xFF, 0xC0, 0x00), [Step(STEP_CONSUMER, consumer=_CC_VOL_UP)]),
                     Binding((0x00, 0xFF, 0x00), [Step(STEP_CONSUMER, consumer=_CC_SCAN_PREV)]),
                     Binding((0x00, 0x60, 0xFF), [Step(STEP_CONSUMER, consumer=_CC_SCAN_NEXT)]),
-                    Binding((0x80, 0x00, 0xFF), [Step(STEP_KEY, keycode=_KEY_ESCAPE)]),
-                ],
-            ),
-            Profile(
-                "text", 1000, 250, OVERFLOW_WRAP_CANCEL, 8, 64, IDLE_SOLID, (0x08, 0x08, 0x08),
-                Binding((0xFF, 0xFF, 0xFF), [Step(STEP_TEXT, text="Acknowledged.")]),
-                [
-                    Binding((0xFF, 0x00, 0x00), [Step(STEP_TEXT, text="On my way.")]),
-                    Binding((0x00, 0xFF, 0x00), [Step(STEP_TEXT, text="Looks good to me.")]),
-                    Binding((0x00, 0x60, 0xFF), [
-                        Step(STEP_KEY, keycode=_KEY_A, mods=_MOD_CTRL),
-                        Step(STEP_KEY, keycode=_KEY_C, mods=_MOD_CTRL),
-                    ]),
-                    Binding((0xFF, 0xC0, 0x00), [
-                        Step(STEP_TEXT, text="brb"),
-                        Step(STEP_DELAY, delay_ms=200),
-                        Step(STEP_KEY, keycode=_KEY_ENTER),
+                    # Screenshot, wait for the clipboard to fill, paste. The delay is the
+                    # reason a binding is a sequence rather than a single action.
+                    Binding((0x80, 0x00, 0xFF), [
+                        Step(STEP_KEY, keycode=_KEY_PRINT_SCREEN),
+                        Step(STEP_DELAY, delay_ms=300),
+                        Step(STEP_KEY, keycode=_KEY_V, mods=_MOD_CTRL),
                     ]),
                 ],
             ),

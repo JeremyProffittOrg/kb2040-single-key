@@ -66,8 +66,8 @@ func TestSetColour(t *testing.T) {
 }
 
 func TestSetNestedStepText(t *testing.T) {
-	cfg := apply(t, "profiles.1.tap.steps.0.text", "Back in five.")
-	if got := cfg.Profiles[1].Tap.Steps[0].Text; got != "Back in five." {
+	cfg := apply(t, "profiles.0.slots.0.steps.0.text", "Back in five.")
+	if got := cfg.Profiles[0].Slots[0].Steps[0].Text; got != "Back in five." {
 		t.Errorf("text = %q", got)
 	}
 }
@@ -98,8 +98,8 @@ func TestSetWholeStepsList(t *testing.T) {
 }
 
 func TestSetQuotedStringKeepsQuotesOut(t *testing.T) {
-	cfg := apply(t, "profiles.1.tap.steps.0.text", `"say \"hi\""`)
-	if got := cfg.Profiles[1].Tap.Steps[0].Text; got != `say "hi"` {
+	cfg := apply(t, "profiles.0.slots.0.steps.0.text", `"say \"hi\""`)
+	if got := cfg.Profiles[0].Slots[0].Steps[0].Text; got != `say "hi"` {
 		t.Errorf("text = %q, want %q", got, `say "hi"`)
 	}
 }
@@ -108,10 +108,10 @@ func TestGet(t *testing.T) {
 	doc := defaultJSON(t)
 	for path, want := range map[string]string{
 		"active":                   "0",
-		"profiles.0.name":          `"media"`,
+		"profiles.0.name":          `"colors"`,
 		"profiles.0.dwell_ms":      "1000",
 		"profiles.0.slots.0.color": `"#FF0000"`,
-		"profiles.1.tap.steps.0":   `{"text":"Acknowledged."}`,
+		"profiles.1.tap.steps.0":   `{"consumer":"PLAY_PAUSE"}`,
 		"profiles.0.overflow":      `"wrap"`,
 	} {
 		got, err := patch.Get(doc, path)

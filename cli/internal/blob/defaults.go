@@ -1,20 +1,24 @@
 package blob
 
 // DefaultConfig is the factory configuration. It is the single definition of "defaults" for
-// the whole project: the Go CLI writes it with `kb2040ctl defaults --local`, the firmware
-// writes the same bytes into blank or corrupt NVM, and tests/fixtures/default.bin is its
-// encoding. The Python side builds the same structure and must produce identical bytes.
+// the whole project: the firmware writes these bytes into blank or corrupt NVM, and
+// tests/fixtures/default.bin is its encoding. The Python side builds the same structure and
+// must produce identical bytes.
 //
-// It deliberately exercises every step type so that a fresh board demonstrates the whole
-// feature set: a tap, media keys on colour slots, canned text, a modifier chord, and a
-// sequence with a delay.
+// Profile 0 is deliberately self-describing: a tap takes a screenshot, and every colour
+// slot types the name of the colour it is showing. That makes the gesture teach itself --
+// hold, watch the LEDs, release, and the word that appears tells you whether you let go
+// when you meant to.
+//
+// Between the two profiles every step type is exercised (key, text, consumer, delay), which
+// is what keeps the cross-language golden vector honest.
 func DefaultConfig() *Config {
 	return &Config{
 		FormatVersion: FormatVersion,
 		Active:        0,
 		Profiles: []Profile{
 			{
-				Name:       "media",
+				Name:       "colors",
 				DwellMS:    1000,
 				TapMaxMS:   250,
 				Overflow:   OverflowWrap,
@@ -22,18 +26,22 @@ func DefaultConfig() *Config {
 				Brightness: 64,
 				IdleMode:   IdleBreathe,
 				IdleColor:  RGB{0x00, 0x10, 0x18},
-				Tap:        binding(RGB{0xFF, 0xFF, 0xFF}, consumerStep("PLAY_PAUSE")),
+				Tap:        binding(RGB{0xFF, 0xFF, 0xFF}, keyStep("PRINT_SCREEN")),
+				// One slot per LED in the default eight-pixel chain, in wheel order, so the
+				// colour a slot types is the colour the strip is showing.
 				Slots: []Binding{
-					binding(RGB{0xFF, 0x00, 0x00}, consumerStep("MUTE")),
-					binding(RGB{0xFF, 0x60, 0x00}, consumerStep("VOLUME_DECREMENT")),
-					binding(RGB{0xFF, 0xC0, 0x00}, consumerStep("VOLUME_INCREMENT")),
-					binding(RGB{0x00, 0xFF, 0x00}, consumerStep("SCAN_PREVIOUS_TRACK")),
-					binding(RGB{0x00, 0x60, 0xFF}, consumerStep("SCAN_NEXT_TRACK")),
-					binding(RGB{0x80, 0x00, 0xFF}, keyStep("ESCAPE")),
+					binding(RGB{0xFF, 0x00, 0x00}, textStep("Red")),
+					binding(RGB{0xFF, 0x60, 0x00}, textStep("Orange")),
+					binding(RGB{0xFF, 0xC0, 0x00}, textStep("Yellow")),
+					binding(RGB{0x00, 0xFF, 0x00}, textStep("Green")),
+					binding(RGB{0x00, 0xFF, 0xFF}, textStep("Cyan")),
+					binding(RGB{0x00, 0x00, 0xFF}, textStep("Blue")),
+					binding(RGB{0x80, 0x00, 0xFF}, textStep("Violet")),
+					binding(RGB{0xFF, 0x00, 0xFF}, textStep("Magenta")),
 				},
 			},
 			{
-				Name:       "text",
+				Name:       "media",
 				DwellMS:    1000,
 				TapMaxMS:   250,
 				Overflow:   OverflowWrapCancel,
@@ -41,12 +49,17 @@ func DefaultConfig() *Config {
 				Brightness: 64,
 				IdleMode:   IdleSolid,
 				IdleColor:  RGB{0x08, 0x08, 0x08},
-				Tap:        binding(RGB{0xFF, 0xFF, 0xFF}, textStep("Acknowledged.")),
+				Tap:        binding(RGB{0xFF, 0xFF, 0xFF}, consumerStep("PLAY_PAUSE")),
 				Slots: []Binding{
-					binding(RGB{0xFF, 0x00, 0x00}, textStep("On my way.")),
-					binding(RGB{0x00, 0xFF, 0x00}, textStep("Looks good to me.")),
-					binding(RGB{0x00, 0x60, 0xFF}, keyStep("A", "CTRL"), keyStep("C", "CTRL")),
-					binding(RGB{0xFF, 0xC0, 0x00}, textStep("brb"), delayStep(200), keyStep("ENTER")),
+					binding(RGB{0xFF, 0x00, 0x00}, consumerStep("MUTE")),
+					binding(RGB{0xFF, 0x60, 0x00}, consumerStep("VOLUME_DECREMENT")),
+					binding(RGB{0xFF, 0xC0, 0x00}, consumerStep("VOLUME_INCREMENT")),
+					binding(RGB{0x00, 0xFF, 0x00}, consumerStep("SCAN_PREVIOUS_TRACK")),
+					binding(RGB{0x00, 0x60, 0xFF}, consumerStep("SCAN_NEXT_TRACK")),
+					// Screenshot, wait for the clipboard to fill, paste. The delay is the
+					// reason a binding is a sequence rather than a single action.
+					binding(RGB{0x80, 0x00, 0xFF},
+						keyStep("PRINT_SCREEN"), delayStep(300), keyStep("V", "CTRL")),
 				},
 			},
 		},

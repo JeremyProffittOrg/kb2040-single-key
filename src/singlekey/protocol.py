@@ -55,7 +55,7 @@ class Protocol:
         if self._buf is not None:
             return self._handle_upload_line(line, now)
 
-        line = line.strip()
+        line = _sanitize(line)
         if not line:
             return []
 
@@ -216,3 +216,14 @@ def _int(text, what):
 
 def _elapsed(now, then):
     return max(0, ticks_diff(now, then))
+
+
+def _sanitize(line):
+    """Strip whitespace and any stray control characters from a command line.
+
+    A serial monitor attaching, or a Ctrl-C meant for the REPL landing on the data port,
+    leaves a control byte glued to the front of the next command -- which turned a valid
+    ``version`` into an unknown command until the port was reopened. Only the command path
+    is sanitised; an upload stays byte-exact so corruption there is still detected.
+    """
+    return "".join(c for c in line if c >= " " and c != "\x7f").strip()

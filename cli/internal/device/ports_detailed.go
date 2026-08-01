@@ -30,3 +30,5 @@ func ListPorts() ([]PortInfo, error) {
 	}
 	return append(adafruit, others...), nil
 }
+
+const portsHaveUSBMetadata = true

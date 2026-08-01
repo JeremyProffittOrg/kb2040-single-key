@@ -63,6 +63,31 @@ The board stores several complete configurations and one is active at a time. Sw
 `kb2040ctl profile use 1`. Profiles are uploaded and downloaded as JSON, so you can keep as
 many on disk as you like.
 
+## Out of the box
+
+The factory configuration has two profiles. Profile 0, `colors`, is active and is
+deliberately self-describing:
+
+| Gesture | Colour | Action |
+|---|---|---|
+| tap | white | **Print Screen** |
+| hold → release on slot 0 | red | types `Red` |
+| hold → release on slot 1 | orange | types `Orange` |
+| hold → release on slot 2 | yellow | types `Yellow` |
+| hold → release on slot 3 | green | types `Green` |
+| hold → release on slot 4 | cyan | types `Cyan` |
+| hold → release on slot 5 | blue | types `Blue` |
+| hold → release on slot 6 | violet | types `Violet` |
+| hold → release on slot 7 | magenta | types `Magenta` |
+
+One slot per LED in the default eight-pixel chain, in the same order the startup rainbow
+sweeps them. Because each slot types the name of the colour it is showing, the gesture
+teaches itself: hold, watch the strip, release, and the word that appears tells you whether
+you let go when you meant to.
+
+Profile 1, `media`, is play/pause on tap with mute, volume and track controls on the colour
+slots — switch to it with `kb2040ctl profile use 1`.
+
 ---
 
 ## Wiring
@@ -143,10 +168,10 @@ $ kb2040ctl ports
 $ kb2040ctl info
 port       COM7
 firmware   0.1.0 (format 1)
-storage    183 / 4096 bytes used (3913 free)
+storage    204 / 4096 bytes used (3892 free)
 
-* 0  media            6 slots, 1000ms dwell, wrap overflow, 8 LEDs
-  1  text             4 slots, 1000ms dwell, wrap_cancel overflow, 8 LEDs
+* 0  colors           8 slots, 1000ms dwell, wrap overflow, 8 LEDs
+  1  media            6 slots, 1000ms dwell, wrap_cancel overflow, 8 LEDs
 ```
 
 Two ports appear because the board exposes both the REPL console and the config port. They
@@ -161,7 +186,7 @@ have identical USB IDs, so `kb2040ctl` finds the right one by asking each until 
 ```bash
 kb2040ctl set profiles.0.dwell_ms 1500
 kb2040ctl set profiles.0.slots.2.color "#00FF80"
-kb2040ctl set profiles.1.tap.steps.0.text "Back in five."
+kb2040ctl set profiles.0.slots.0.steps.0.text "Back in five."
 kb2040ctl get profiles.0.overflow
 ```
 
@@ -271,8 +296,8 @@ fixed per-profile limit — spend the space how you like:
 ```console
 $ kb2040ctl validate mine.json
 mine.json is valid: 3 profile(s), 620 / 4096 bytes (3476 free)
-  0  media            6 slots, 67 bytes
-  1  text             4 slots, 100 bytes
+  0  colors           8 slots, 115 bytes
+  1  media            6 slots, 73 bytes
   2  meetings         4 slots, 169 bytes
 ```
 

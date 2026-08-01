@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JeremyProffittOrg/kb2040-single-key/cli/internal/blob"
 	"github.com/JeremyProffittOrg/kb2040-single-key/cli/internal/device"
@@ -277,3 +278,43 @@ type silentPort struct{}
 func (silentPort) Read(p []byte) (int, error)  { return 0, nil }
 func (silentPort) Write(p []byte) (int, error) { return len(p), nil }
 func (silentPort) Close() error                { return nil }
+
+// TestStaleOutputIsResynchronised covers the failure that showed up on hardware: an earlier
+// run was interrupted after issuing a command, leaving its unread reply in the port's
+// buffer. The next process then read that reply as if it answered its own command --
+// `info` came back with `OK 204`, the terminator of a previous `read`.
+func TestStaleOutputIsResynchronised(t *testing.T) {
+	board := newFakeBoard()
+	conn := device.NewConn("fake0", board)
+	t.Cleanup(func() { conn.Close() })
+
+	// Whatever a previous, abandoned session left behind.
+	board.mu.Lock()
+	board.reply("<F*2M7/c", "leftover ascii85 payload", "OK 204")
+	board.mu.Unlock()
+
+	info, err := conn.Info()
+	if err != nil {
+		t.Fatalf("Info with stale output pending: %v", err)
+	}
+	if info.Firmware != "0.1.0" || info.NVMSize != blob.NVMSize {
+		t.Fatalf("stale output leaked into the reply: %+v", info)
+	}
+}
+
+func TestDrainClearsPendingOutput(t *testing.T) {
+	board := newFakeBoard()
+	conn := device.NewConn("fake0", board)
+	t.Cleanup(func() { conn.Close() })
+
+	board.mu.Lock()
+	board.reply("junk one", "junk two")
+	board.mu.Unlock()
+
+	conn.Drain(200 * time.Millisecond)
+
+	// The very next thing read must be the fresh reply, not the junk.
+	if _, err := conn.Command("version"); err != nil {
+		t.Fatalf("command after drain: %v", err)
+	}
+}

@@ -28,3 +28,6 @@ func ListPorts() ([]PortInfo, error) {
 	}
 	return ports, nil
 }
+
+// This build cannot tell a USB port from any other, so Autodetect must not filter.
+const portsHaveUSBMetadata = false

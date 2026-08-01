@@ -32,7 +32,10 @@ class NvmStore:
             self.status = STATUS_NO_NVM
             return blob.default_config(), self.status
 
-        data = bytes(self.nvm)
+        # Slice, do not iterate: microcontroller.nvm is an nvm.ByteArray, which supports
+        # len() and slicing but is not iterable, so bytes(self.nvm) raises TypeError on the
+        # real hardware even though it works on a bytearray.
+        data = bytes(self.nvm[:])
         if _is_blank(data):
             self.status = STATUS_BLANK
             return blob.default_config(), self.status
@@ -72,13 +75,14 @@ class NvmStore:
 
     def stored_length(self):
         """Length of the blob currently in NVM, or 0 if there is not a readable one."""
-        if self.nvm is None:
+        if self.nvm is None or len(self.nvm) < blob.HEADER_BASE:
             return 0
-        data = bytes(self.nvm)
-        if len(data) < blob.HEADER_BASE or bytes(data[0:4]) != blob.MAGIC:
+        # Only the header is needed, so read ten bytes rather than copying the whole region.
+        head = bytes(self.nvm[0 : blob.HEADER_BASE])
+        if head[0:4] != blob.MAGIC:
             return 0
-        total = data[8] | (data[9] << 8)
-        return total if blob.HEADER_BASE + blob.CRC_TRAILER <= total <= len(data) else 0
+        total = head[8] | (head[9] << 8)
+        return total if blob.HEADER_BASE + blob.CRC_TRAILER <= total <= len(self.nvm) else 0
 
     def read_blob(self):
         """Return the stored blob exactly as written, or ``None`` if there is not one."""

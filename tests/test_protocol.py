@@ -270,7 +270,7 @@ def test_tick_is_silent_when_no_upload_is_running(proto):
 
 
 def test_profile_switches_the_active_profile(proto, device):
-    assert terminator(proto.handle_line("profile 1")) == "OK active=1 name=text"
+    assert terminator(proto.handle_line("profile 1")) == "OK active=1 name=media"
     assert device.config_obj.active == 1
 
 
@@ -339,3 +339,37 @@ def test_defaults_restores_the_factory_config(proto, device):
     line = terminator(proto.handle_line("defaults"))
     assert line.startswith("OK defaults written")
     assert device.config_obj == blob.default_config()
+
+
+# ------------------------------------------------------ resilience to line noise
+
+
+@pytest.mark.parametrize("junk", ["\x03", "\x00", "\x1b", "\x7f", "\x03\x03"])
+def test_stray_control_characters_do_not_break_a_command(proto, junk):
+    """A Ctrl-C aimed at the REPL, or a serial monitor attaching, can leave a control byte
+    glued to the front of the next command. That turned `version` into an unknown command
+    on real hardware until the port was reopened."""
+    assert terminator(proto.handle_line(junk + "version")).startswith("OK fw=")
+    assert terminator(proto.handle_line("version" + junk)).startswith("OK fw=")
+
+
+def test_control_characters_alone_are_ignored(proto):
+    assert proto.handle_line("\x03") == []
+    assert proto.handle_line("\x00\x1b") == []
+
+
+def test_uploads_stay_byte_exact(proto, device):
+    """Sanitising is deliberately limited to the command path: a control byte inside a
+    transfer must still be caught rather than silently dropped, or the character count and
+    the CRC would disagree about what arrived."""
+    data = blob.encode(blob.default_config())
+    before = device.read_blob()
+
+    proto.handle_line("write %d %d" % (len(data), blob.crc16(data)))
+    lines = a85.encode_lines(data)
+    out = []
+    for i, line in enumerate(lines):
+        out = proto.handle_line(("\x03" + line) if i == 0 else line)
+
+    assert terminator(out).startswith("ERR")
+    assert device.read_blob() == before

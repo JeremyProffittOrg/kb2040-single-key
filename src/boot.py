@@ -27,3 +27,8 @@ usb_hid.enable((usb_hid.Device.KEYBOARD, usb_hid.Device.CONSUMER_CONTROL))
 # Names the port in the host's device list. VID/PID are left alone so the board still
 # enumerates as an Adafruit device and needs no new drivers.
 supervisor.set_usb_identification(manufacturer="jeremy.ninja", product="KB2040 Single Key")
+
+# Recorded in boot_out.txt. Without this there is no way to tell "boot.py ran and worked"
+# from "boot.py never ran" -- both leave boot_out.txt holding just the CircuitPython banner,
+# and the difference matters because the config port only exists if this file ran.
+print("kb2040-single-key: usb_cdc console+data enabled, HID = keyboard + consumer control")

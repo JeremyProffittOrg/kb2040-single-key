@@ -7,8 +7,50 @@ from singlekey import blob
 from singlekey.nvmstore import NvmStore, STATUS_BLANK, STATUS_NO_NVM, STATUS_OK
 
 
+class FakeNvm:
+    """Stands in for ``microcontroller.nvm``, which is an ``nvm.ByteArray``.
+
+    That type supports ``len()``, slicing and slice assignment, but is **not iterable** --
+    ``bytes(nvm)`` raises ``TypeError`` on the real board. Using a plain ``bytearray`` here
+    originally hid exactly that bug until the firmware was run on hardware, so the double
+    now blocks iteration the same way (``__iter__ = None`` also defeats Python's
+    ``__getitem__`` iteration fallback).
+    """
+
+    __iter__ = None
+
+    def __init__(self, size=blob.NVM_SIZE, filler=0xFF):
+        self._buf = bytearray([filler]) * size
+
+    def __len__(self):
+        return len(self._buf)
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return bytes(self._buf[index])
+        return self._buf[index]
+
+    def __setitem__(self, index, value):
+        self._buf[index] = value
+
+
 def fresh_nvm(filler=0xFF):
-    return bytearray([filler]) * blob.NVM_SIZE
+    return FakeNvm(filler=filler)
+
+
+def test_the_double_rejects_iteration_like_the_hardware():
+    """Guards the guard: if this ever starts passing, the double has stopped reproducing
+    the constraint that caused the first hardware boot to fail."""
+    with pytest.raises(TypeError):
+        bytes(fresh_nvm())
+    with pytest.raises(TypeError):
+        list(fresh_nvm())
+    # ...while the operations the store actually uses all work.
+    nvm = fresh_nvm()
+    assert len(nvm) == blob.NVM_SIZE
+    assert nvm[0:4] == b"\xff\xff\xff\xff"
+    nvm[0:3] = b"abc"
+    assert nvm[0:3] == b"abc"
 
 
 def test_blank_nvm_falls_back_to_defaults():

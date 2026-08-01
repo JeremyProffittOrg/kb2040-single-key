@@ -423,3 +423,52 @@ much smaller region would work; only the number quoted as "free" would change.
   `PicoArduino` descriptor is generic across RP2040 boards and does not confirm a KB2040.
 - Background watcher armed (task `bq0e5lsno`) polling for an `RPI-RP2` or `CIRCUITPY` volume.
 
+### 2026-08-01 — HARDWARE BRING-UP COMPLETE (B1, B4 unblocked)
+
+The attached board was running an Arduino sketch. Identified it definitively from
+`arduino-pico`'s `boards.txt` (`adafruit_kb2040.pid.0=0x8105`) rather than guessing —
+`INFO_UF2.TXT` cannot identify an RP2040 board, because the bootloader is in the chip's
+mask ROM and always reports `Model: Raspberry Pi RP2 / Board-ID: RPI-RP2`.
+
+- Entered the UF2 bootloader with the Arduino **1200-baud touch** (double-tap RESET had not
+  worked), installed **CircuitPython 10.2.1 for adafruit_kb2040**, verified the UF2 header
+  (family `0xe48bff56`) before writing.
+- `boot_out.txt`: `Adafruit CircuitPython 10.2.1 ... Adafruit KB2040 with rp2040`,
+  UID `DF6114B5C37B432F` — matching the USB serial seen under Arduino, so same board.
+- **B1 ANSWERED: `microcontroller.nvm` is 4096 bytes on real hardware.** The plan-time
+  assumption held; stop condition 1 never triggered.
+- **B4 DONE:** after a hard reset, two CDC ports enumerate (COM27 console, COM28 data), HID
+  is keyboard + consumer control with the mouse correctly suppressed, and `boot_out.txt`
+  records the boot.py line.
+- Verified on hardware: autodetect picks the data port (COM28) unaided; `info`; `download`
+  byte-identical to `examples/default.json`; `set`/`get` round-trip; `profile use`;
+  `defaults`. **Persistence proven**: `dwell_ms` set to 1234, hard reset, read back 1234.
+- Board left in factory state, `storage ok`, 204 / 4096 bytes.
+
+#### Three bugs only hardware could find
+
+1. `nvmstore.load()` did `bytes(self.nvm)`. `microcontroller.nvm` is an `nvm.ByteArray`:
+   sized and sliceable but **not iterable**, so this raised `TypeError` and the firmware
+   died on its first boot. Fixed to slice. The host tests used a plain `bytearray`, which
+   *is* iterable — the test double is now a `FakeNvm` with `__iter__ = None` that reproduces
+   the constraint, plus a test asserting the double still refuses iteration.
+2. `Autodetect` opened every serial port, including Bluetooth ones. Opening an idle
+   Bluetooth port blocks for minutes; a single `info` hung past 120s. It now skips non-USB
+   ports, guarded by `portsHaveUSBMetadata` so cgo-less macOS (which has no USB metadata)
+   still probes everything.
+3. An interrupted run left its unread reply in the port buffer, and the next process read it
+   as its own — `info` returned `OK 204`, the terminator of an earlier `read`. The client now
+   drains before every command, making it self-resynchronising. Firmware also strips control
+   characters from command lines, after a stray Ctrl-C turned `version` into
+   `'\x03version'`.
+
+Test count 137 → **156**. All three fixes have regression tests.
+
+#### Default configuration changed (user request)
+
+Profile 0 `colors` (active): tap = **Print Screen**; the eight colour slots type the name of
+the colour they are showing — Red, Orange, Yellow, Green, Cyan, Blue, Violet, Magenta — one
+per LED in the default chain, in the same order the startup sweep paints them. Profile 1
+`media` keeps play/pause plus volume and track controls, and carries the delay step that
+keeps the cross-language golden vector covering all four step types. 204 / 4096 bytes.
+
