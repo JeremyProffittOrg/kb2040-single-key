@@ -117,6 +117,13 @@ This installs the CircuitPython libraries with `circup` and copies `src/` onto t
 Then **unplug and replug the board** — `boot.py` only takes effect on a hard reset, and it
 is what creates the second serial port.
 
+On every start the board runs a **rainbow sweep** across the onboard NeoPixel and the whole
+external chain, then settles into the profile's idle animation. That is the self-test: if
+all your pixels light and show a smooth spread of colour, the data line, the chain length
+and the power are all good. It runs regardless of the profile's `idle_mode` and stays
+visible even at `brightness: 0`, because it is the only diagnostic the board has before
+anything can talk to it.
+
 ### 3. Build the CLI
 
 ```bash
@@ -288,6 +295,17 @@ Close it and try again, or pass `-port` explicitly.
 stored configuration and fell back to the factory defaults; the status says why (`blank` on
 a board that has never been configured, `corrupt: ...` otherwise). Uploading a configuration
 clears it.
+
+**No startup rainbow at all.** The firmware is not running. Check the REPL on the *console*
+serial port for a traceback — a missing library (`adafruit_hid`, `neopixel`) is the usual
+cause, so re-run `scripts/flash.ps1` without `-SkipLibraries`.
+
+**Startup rainbow on the onboard pixel but not the chain.** Either `ext_count` is 0
+(`kb2040ctl get profiles.0.ext_count`) or the chain is not receiving data — check `D10` to
+the *first* pixel's `DIN`, and that the strip's ground is tied to the board's.
+
+**Only some of the chain lights during the startup rainbow.** `ext_count` is smaller than
+the number of pixels you attached. `kb2040ctl set profiles.0.ext_count 8`.
 
 **The key does nothing but the LEDs work.** The switch is not reaching `D4`/`GND`. Check with
 `kb2040ctl watch` — no `press` line means the firmware never sees the key.

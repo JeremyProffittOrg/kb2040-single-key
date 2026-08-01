@@ -129,6 +129,11 @@ class Device:
 
     def show_leds(self, now):
         self.leds.render(now)
+        self.push_pixels()
+
+    def push_pixels(self):
+        """Copy the engine's buffers to the hardware. Separate from show_leds so the
+        startup sweep can drive the pixels without going through the idle renderer."""
         buf = self.leds.onboard
         self.onboard[0] = (buf[0], buf[1], buf[2])
         self.onboard.show()
@@ -139,6 +144,20 @@ class Device:
                 base = 3 * i
                 self.ext[i] = (ebuf[base], ebuf[base + 1], ebuf[base + 2])
             self.ext.show()
+
+    def startup_sweep(self):
+        """Run the rainbow self-test across the onboard pixel and the external chain.
+
+        Blocking on purpose: it happens once, before the key or the config port matter,
+        and it is the only sign of life the board gives if something is wrong early.
+        """
+        start = supervisor.ticks_ms()
+        while True:
+            elapsed = ticks_diff(supervisor.ticks_ms(), start)
+            if not self.leds.boot_frame(elapsed):
+                break
+            self.push_pixels()
+            time.sleep(FRAME_MS / 1000)
 
 
 class KeyReader:
@@ -200,8 +219,11 @@ def main():
         # boot.py has run on a hard reset.
         print("kb2040-single-key: no data CDC port. Hard-reset the board so boot.py runs.")
 
-    print("kb2040-single-key %s: profile %r, storage %s"
-          % (protocol.FW_VERSION, device.config_obj.active_profile().name, device.status()))
+    print("kb2040-single-key %s: profile %r, storage %s, %d external LED(s)"
+          % (protocol.FW_VERSION, device.config_obj.active_profile().name,
+             device.status(), device.leds.ext_count))
+
+    device.startup_sweep()
 
     last_frame = supervisor.ticks_ms()
     last_display = None
