@@ -34,13 +34,21 @@ offset  size          field
 5       1             flags       u8, reserved, must be 0
 6       1             active      u8, index of the active profile (< nprofiles)
 7       1             nprofiles   u8, 1..8
-8       2*nprofiles   offsets     u16[nprofiles], byte offset of each profile record
+8       2             blob_len    u16, total blob size in bytes, including magic and crc
+10      2*nprofiles   offsets     u16[nprofiles], byte offset of each profile record
 ...     variable      profiles    the profile records, in index order
 end-2   2             crc16       u16, CRC-16/CCITT-FALSE over bytes [0, end-2)
 ```
 
 `crc16` is the last two bytes of the blob. Everything before it is covered by the checksum,
-including the magic and the offset table.
+including the magic, `blob_len` and the offset table.
+
+`blob_len` is what makes a blob **self-delimiting**. NVM is a fixed 4096-byte region and a
+blob is almost always shorter, so a reader is handed the whole region and has no other way
+to know where the blob ends — and it must know that before it can check the CRC, which sits
+at the end. A decoder reads `blob_len` first, rejects it if it exceeds the buffer it was
+given, truncates to it, and ignores everything after. The same field lets a `.bin` file on
+disk stand alone.
 
 ### CRC-16/CCITT-FALSE
 
@@ -150,11 +158,25 @@ failure is reported by `version`/`info` rather than silently swallowed.
 
 ## Wire encoding
 
-Blobs move over the serial port as **Ascii85**, btoa flavour: no `<~ ~>` wrapper, `z`
-shortcut for all-zero 4-byte groups, character range `!`..`u` (ASCII 33–117). Lines are
-wrapped at 80 characters; the decoder ignores newlines. This is Go's stdlib
-`encoding/ascii85`; CircuitPython has no equivalent, so `src/singlekey/a85.py` implements it
-and is pinned to Go by `tests/fixtures/default.a85`.
+Blobs move over the serial port as **Ascii85**, btoa flavour: no `<~ ~>` wrapper, character
+range `!`..`u` (ASCII 33–117). Lines are wrapped at 80 characters; decoders ignore newlines.
+Both sides accept the `z` shorthand for an all-zero group, and **neither side emits it**.
+
+That last rule is what makes an upload framable. With `z` suppressed, the encoded length is
+a pure function of the input length:
+
+```
+encoded_len(n) = 5*(n/4) + (n%4 ? n%4 + 1 : 0)
+```
+
+so the receiver knows exactly how many characters a declared `write <len>` will take and
+detects the end by counting. A terminator character was the obvious alternative and does not
+work: every candidate (`.`, `!`, `~`) is itself legal Ascii85, and a final line can be a
+single character, so a terminator is genuinely ambiguous rather than merely unlikely.
+
+Go gets Ascii85 from stdlib `encoding/ascii85` (`cli/internal/wire` expands the `z` it
+emits); CircuitPython has no equivalent, so `src/singlekey/a85.py` implements it. The two
+are pinned by `tests/fixtures/default.a85`.
 
 Ascii85 costs 25% overhead against base64's 33% — a full 4096-byte blob is ~5.1 KB on the
 wire rather than ~5.5 KB.
@@ -169,12 +191,34 @@ Every command emits exactly one terminating `OK`, `OK <detail>`, or `ERR <reason
 | `help` | one line per command |
 | `version` | `OK fw=<v> fmt=<n> nvm=<bytes> used=<bytes> profiles=<n> active=<n> status=<ok\|reason>` |
 | `read` | Ascii85 blob, 80 chars per line, then `OK` |
-| `write <len> <crc16>` | then Ascii85 lines, then a `.` line; device verifies length and CRC before committing |
-| `profile <n>` | set the active profile and persist just that byte |
+| `write <len> <crc16>` | then exactly `encoded_len(len)` Ascii85 characters; see below |
+| `profile <n>` | set the active profile and persist it |
 | `test <profile> <binding>` | fire a binding on demand |
 | `events on\|off` | stream `EV press`, `EV slot <i> <RRGGBB>`, `EV cancel`, `EV fire <binding>`, `EV release` |
 | `defaults` | rewrite factory defaults to NVM |
 
-`write` is atomic: the incoming blob is buffered, length- and CRC-checked, and decoded
-before anything touches NVM or the live config. A failed `write` leaves the device exactly
-as it was.
+### `write`
+
+The header line declares the decoded byte count and `crc16` **of the decoded bytes** — that
+is a transport check, independent of the CRC stored inside the blob, and it catches a
+corrupted or truncated serial transfer before the blob is ever parsed. `crc16` may be
+decimal or `0x`-prefixed.
+
+A malformed header is answered immediately with `ERR`. A well-formed one produces **no
+response**; the device then consumes Ascii85 characters until it has `encoded_len(len)` of
+them, and only then answers with a single `OK written <n>` or `ERR <reason>`. That keeps the
+"exactly one terminating line per command" rule intact for a multi-line command.
+
+`write` is atomic. The transfer is buffered, then checked in order — character count, decode,
+byte count, transport CRC, blob decode — and only a blob that passes every check is written
+to NVM and made live. Any failure leaves the device exactly as it was.
+
+An abandoned transfer (the host dies mid-upload) times out after 5 seconds of silence,
+emits `ERR write timed out`, and returns the device to accepting commands. Without that, a
+half-finished upload would wedge the config port until the board was replugged.
+
+### `EV` lines
+
+`EV` lines are emitted asynchronously while `events on` is in effect, so they can appear
+between a command and its terminating `OK`. A client must skip lines beginning with `EV `
+when reading a command response.

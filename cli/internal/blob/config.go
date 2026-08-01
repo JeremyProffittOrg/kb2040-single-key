@@ -75,7 +75,7 @@ const (
 	MaxSteps     = 64
 	MaxTextLen   = 255
 	MaxDelayMS   = 10000
-	headerBase   = 8 // magic + fmt_ver + flags + active + nprofiles
+	headerBase   = 10 // magic + fmt_ver + flags + active + nprofiles + blob_len
 	crcTrailer   = 2
 	bindingFixed = 4 // color[3] + nsteps
 )

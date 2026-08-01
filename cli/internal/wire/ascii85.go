@@ -17,10 +17,25 @@ import (
 const LineWidth = 80
 
 // Encode returns the Ascii85 form of data as a single unwrapped string.
+//
+// The standard library's `z` shorthand for an all-zero group is expanded back to "!!!!!".
+// Suppressing it makes the encoded length a pure function of the input length (see
+// EncodedLen), which is what lets the firmware detect the end of an upload by counting
+// characters rather than looking for a terminator -- and every plausible terminator
+// character is itself legal Ascii85, so counting is the only unambiguous option.
 func Encode(data []byte) string {
 	out := make([]byte, ascii85.MaxEncodedLen(len(data)))
 	n := ascii85.Encode(out, data)
-	return string(out[:n])
+	return strings.ReplaceAll(string(out[:n]), "z", "!!!!!")
+}
+
+// EncodedLen is the exact number of characters Encode produces for n bytes.
+func EncodedLen(n int) int {
+	rem := n % 4
+	if rem == 0 {
+		return 5 * (n / 4)
+	}
+	return 5*(n/4) + rem + 1
 }
 
 // EncodeLines returns the Ascii85 form of data wrapped at LineWidth characters, which is

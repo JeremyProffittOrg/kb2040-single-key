@@ -247,9 +247,19 @@ func TestDecodeRejectsCorruption(t *testing.T) {
 		}, "active profile"},
 		{"offset outside blob", func(b []byte) []byte {
 			c := clone(b)
-			c[8], c[9] = 0xFF, 0xFF
+			c[10], c[11] = 0xFF, 0xFF
 			return reseal(c)
 		}, "outside the blob"},
+		{"blob_len larger than the buffer", func(b []byte) []byte {
+			c := clone(b)
+			c[8], c[9] = 0xFF, 0x0F
+			return reseal(c)
+		}, "only"},
+		{"blob_len absurdly small", func(b []byte) []byte {
+			c := clone(b)
+			c[8], c[9] = 3, 0
+			return reseal(c)
+		}, "too short to be a blob"},
 	}
 
 	for _, tc := range cases {
@@ -262,6 +272,30 @@ func TestDecodeRejectsCorruption(t *testing.T) {
 				t.Fatalf("error %q should mention %q", err, tc.wantSub)
 			}
 		})
+	}
+}
+
+// TestDecodeIgnoresTrailingNVM covers how the firmware actually reads: it hands Decode the
+// entire 4096-byte NVM region, most of which is whatever was there before.
+func TestDecodeIgnoresTrailingNVM(t *testing.T) {
+	encoded, err := blob.Encode(blob.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	for _, filler := range []byte{0x00, 0xFF, 0x5A} {
+		region := make([]byte, blob.NVMSize)
+		for i := range region {
+			region[i] = filler
+		}
+		copy(region, encoded)
+
+		cfg, err := blob.Decode(region)
+		if err != nil {
+			t.Fatalf("filler %#02x: Decode of a full NVM region: %v", filler, err)
+		}
+		if !reflect.DeepEqual(cfg, blob.DefaultConfig()) {
+			t.Fatalf("filler %#02x: decoded config differs from the default", filler)
+		}
 	}
 }
 

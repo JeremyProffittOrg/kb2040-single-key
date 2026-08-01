@@ -18,9 +18,13 @@ func Encode(c *Config) ([]byte, error) {
 	}
 
 	headerLen := headerBase + 2*len(c.Profiles)
-	out := make([]byte, 0, c.EncodedSize())
+	total := c.EncodedSize()
+	out := make([]byte, 0, total)
 	out = append(out, Magic[:]...)
 	out = append(out, c.FormatVersion, 0 /* flags */, c.Active, uint8(len(c.Profiles)))
+	// blob_len makes the blob self-delimiting, which is what lets the firmware read one
+	// back out of a 4096-byte NVM region without being told how long it is.
+	out = binary.LittleEndian.AppendUint16(out, uint16(total))
 
 	off := headerLen
 	for _, r := range records {
@@ -123,6 +127,18 @@ func Decode(data []byte) (*Config, error) {
 	if data[4] != FormatVersion {
 		return nil, fmt.Errorf("format version %d, this build understands %d", data[4], FormatVersion)
 	}
+
+	// Trust blob_len only as far as the buffer allows. Trailing bytes past blob_len are
+	// ignored, which is what makes it safe to hand Decode a whole 4096-byte NVM dump.
+	total := int(binary.LittleEndian.Uint16(data[8:]))
+	if total < headerBase+crcTrailer {
+		return nil, fmt.Errorf("blob length field says %d bytes, too short to be a blob", total)
+	}
+	if total > len(data) {
+		return nil, fmt.Errorf("blob length field says %d bytes but only %d are present", total, len(data))
+	}
+	data = data[:total]
+
 	body, want := data[:len(data)-crcTrailer], binary.LittleEndian.Uint16(data[len(data)-crcTrailer:])
 	if got := CRC16(body); got != want {
 		return nil, fmt.Errorf("crc mismatch: stored %#04x, computed %#04x", want, got)
