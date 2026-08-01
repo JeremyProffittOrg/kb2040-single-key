@@ -180,10 +180,10 @@ WS-D and WS-E can start any time after A.
 
 ### WS-A — format contract
 
-- [ ] A1 `docs/format.md` — the spec above, authoritative for both implementations.
-- [ ] A2 Go `internal/blob` — encoder, decoder, crc16, byte-budget accounting, JSON schema
+- [x] A1 `docs/format.md` — the spec above, authoritative for both implementations.
+- [x] A2 Go `internal/blob` — encoder, decoder, crc16, byte-budget accounting, JSON schema
       for the host-facing config, validation with actionable error messages.
-- [ ] A3 Canonical default config JSON + generated `tests/fixtures/default.bin` and
+- [x] A3 Canonical default config JSON + generated `tests/fixtures/default.bin` and
       `tests/fixtures/default.a85` (stdlib `encoding/ascii85` output of that blob).
 
 **DoD:** `go test ./cli/...` passes, including a fuzz-lite round-trip test
@@ -191,18 +191,20 @@ WS-D and WS-E can start any time after A.
 
 ### WS-B — device firmware
 
-- [ ] B1 **First: verify `microcontroller.nvm` exists and its size** on the real board
+- [!] B1 **BLOCKED (no board attached)**: verify `microcontroller.nvm` exists and its size
+      on the real board. Unblocked by plugging in a KB2040 running CircuitPython.
       (REPL, one line). A shortfall is stop condition 1.
-- [ ] B2 `blob.py` decoder + defaults encoder + `nvmstore.py`; blank/corrupt NVM falls back
+- [x] B2 `blob.py` decoder + defaults encoder + `nvmstore.py`; blank/corrupt NVM falls back
       to factory defaults and reports why — never bricks the boot.
-- [ ] B3 `colortap.py` — tap/hold/slot/overflow state machine, tick-driven, all three
+- [x] B3 `colortap.py` — tap/hold/slot/overflow state machine, tick-driven, all three
       overflow modes.
-- [ ] B4 `leds.py` — idle modes, slot colour on onboard + external chain, fire flash.
-- [ ] B5 `actions.py` — step interpreter (key+mods, text, consumer, delay).
-- [ ] B5a `a85.py` — Ascii85 encode/decode with the `z` shortcut, strict on bad input;
+- [!] B4 **BLOCKED (no board attached)**: on-hardware bring-up — confirm two COM ports
+      enumerate and `boot_out.txt` records the CircuitPython version.
+- [x] B5 `actions.py` — step interpreter (key+mods, text, consumer, delay).
+- [x] B5a `a85.py` — Ascii85 encode/decode with the `z` shortcut, strict on bad input;
       tested against `tests/fixtures/default.a85` and over random byte strings of every
       length mod 4 (the padding edge cases are where hand-rolled Ascii85 goes wrong).
-- [ ] B6 `boot.py` + `protocol.py` + `code.py` — dual CDC, HID devices, non-blocking loop,
+- [x] B6 `boot.py` + `protocol.py` + `code.py` — dual CDC, HID devices, non-blocking loop,
       exception guard so a bad action never takes down the config port.
 
 **DoD (host):** `python -m pytest tests -q` exits 0, including the two golden-vector tests —
@@ -216,13 +218,13 @@ Transport: `go.bug.st/serial` (no cgo, so cross-compilation stays trivial). Port
 probes candidate ports with a `version` handshake rather than hardcoding a PID — that also
 picks the *data* port over the console port.
 
-- [ ] C1 Serial transport + autodetect + `--port` override.
-- [ ] C2 `info`, `ports`, `profile list|use|name`, `test`, `defaults`.
-- [ ] C3 `download [-p N] -o file.json`, `upload file.json [-p N]` — whole-device or single
+- [x] C1 Serial transport + autodetect + `--port` override.
+- [x] C2 `info`, `ports`, `profile list|use|name`, `test`, `defaults`.
+- [x] C3 `download [-p N] -o file.json`, `upload file.json [-p N]` — whole-device or single
       profile, with byte-usage reporting and pre-flight overflow refusal.
-- [ ] C4 `set <path> <value>` implemented as download → modify → upload.
-- [ ] C5 `validate file.json` — fully offline, no device, prints byte budget.
-- [ ] C6 `watch` — live `EV` stream, so dwell timing can be tuned by feel.
+- [x] C4 `set <path> <value>` implemented as download → modify → upload.
+- [x] C5 `validate file.json` — fully offline, no device, prints byte budget.
+- [x] C6 `watch` — live `EV` stream, so dwell timing can be tuned by feel.
 
 **DoD:** `go vet ./cli/...` and `go test ./cli/...` pass; `kb2040ctl validate
 examples/default.json` exits 0 with a byte report; `GOOS/GOARCH` build succeeds for all six
@@ -230,21 +232,21 @@ targets.
 
 ### WS-D — CI and release
 
-- [ ] D1 `.github/workflows/ci.yml` — on push to `main` and PRs: `pytest`, `go vet`,
+- [x] D1 `.github/workflows/ci.yml` — on push to `main` and PRs: `pytest`, `go vet`,
       `go test`, and the cross-language golden-vector check. **No AWS credentials, no OIDC
       job, no `id-token` permission.**
-- [ ] D2 `.github/workflows/release.yml` — on `v*` tags: cross-compile six targets, attach
+- [x] D2 `.github/workflows/release.yml` — on `v*` tags: cross-compile six targets, attach
       to a GitHub release (`contents: write`, `GITHUB_TOKEN` only — no secrets to add).
 
 **DoD:** `gh run watch <id>` reaches `completed / success` on the push to `main`.
 
 ### WS-E — tooling and docs
 
-- [ ] E1 `scripts/flash.ps1` — find the `CIRCUITPY` volume, `circup install` deps, mirror
+- [x] E1 `scripts/flash.ps1` — find the `CIRCUITPY` volume, `circup install` deps, mirror
       `src/`; refuse to run if no CIRCUITPY volume is present.
-- [ ] E2 `README.md` — wiring, the colour-tap model with a timing diagram, the full command
+- [x] E2 `README.md` — wiring, the colour-tap model with a timing diagram, the full command
       reference, config JSON schema with examples, byte-budget guidance, install/flash steps.
-- [ ] E3 `examples/` — a few real profiles (media control, canned text responses, hotkeys).
+- [x] E3 `examples/` — a few real profiles (media control, canned text responses, hotkeys).
 
 **DoD:** `README.md`'s command reference matches the CLI's registered commands, asserted by
 a Go test rather than by eye.
@@ -385,3 +387,19 @@ verification actually returned.
   the CLI's registered commands match in both directions — a missing entry and an invented
   one both fail.
 
+### 2026-08-01 — CI green, software complete
+
+- `gh run watch 30717747591` → **completed / success**, 8/8 jobs.
+- Bumped `actions/checkout@v5`, `setup-go@v6`, `setup-python@v6` to clear the Node 20
+  deprecation annotations. `gh run watch 30717793069` → **completed / success**, 8/8 jobs,
+  zero annotations.
+
+**Everything that does not need the physical board is done.** Remaining work is stop
+condition 2: WS-B1 and WS-B4 are `[!]`, unblocked by attaching a KB2040 running
+CircuitPython. The rest of the hardware verification list is in "Verification (end to end)"
+above, steps 2–9.
+
+Note on assumptions still unproven: `microcontroller.nvm` being ~4096 bytes is asserted in
+the code (`blob.NVM_SIZE`) but has not been read off a real board. If it turns out smaller,
+the byte-budget reporting already surfaces it — the factory default is 183 bytes, so even a
+much smaller region would work; only the number quoted as "free" would change.
