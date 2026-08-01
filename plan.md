@@ -403,3 +403,23 @@ Note on assumptions still unproven: `microcontroller.nvm` being ~4096 bytes is a
 the code (`blob.NVM_SIZE`) but has not been read off a real board. If it turns out smaller,
 the byte-budget reporting already surfaces it — the factory default is 183 bytes, so even a
 much smaller region would work; only the number quoted as "free" would change.
+### 2026-08-01 — startup rainbow added; hardware bring-up blocked on firmware, not wiring
+
+- Added `LedEngine.boot_frame()` and `Device.startup_sweep()`: a one-shot rainbow across the
+  onboard NeoPixel and the full external chain at every start, fading out into the idle
+  animation. Ignores `idle_mode` and enforces a brightness floor, because it is the only
+  diagnostic the board has before the config port exists. 11 new tests; suite now **148**.
+  CI run 30719755561 green.
+- **Hardware finding (blocks B1/B4):** the attached board enumerates as
+  `USB\VID_2E8A&PID_8105`, `BusReportedDesc: PicoArduino`, one CDC port (COM25), and **no
+  CIRCUITPY or RPI-RP2 volume**. VID `2E8A` is Raspberry Pi, not Adafruit `239A`. Probing
+  COM25 with Ctrl-C produced no REPL prompt.
+  Conclusion: the board is running an **Arduino sketch** (earlephilhower arduino-pico core),
+  not CircuitPython. This is not a wiring fault — nothing in this repo can run until
+  CircuitPython is installed.
+  Unblocked by: double-tap RESET (or hold BOOT while tapping RESET) to expose the `RPI-RP2`
+  bootloader drive, then copying a CircuitPython `.uf2` onto it. `INFO_UF2.TXT` on that
+  drive names the exact board model, which is what decides the correct `.uf2` — the
+  `PicoArduino` descriptor is generic across RP2040 boards and does not confirm a KB2040.
+- Background watcher armed (task `bq0e5lsno`) polling for an `RPI-RP2` or `CIRCUITPY` volume.
+
