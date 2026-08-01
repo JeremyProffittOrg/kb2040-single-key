@@ -1,0 +1,9 @@
+# Golden fixtures are compared byte for byte by both the Go and the Python test suites, on
+# Windows and on Linux CI. Any line-ending translation would make them disagree, so text is
+# normalised to LF everywhere and the binary blob is never touched.
+* text=auto eol=lf
+
+tests/fixtures/default.bin binary
+tests/fixtures/default.a85 text eol=lf
+
+*.ps1 text eol=crlf
