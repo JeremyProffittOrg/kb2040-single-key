@@ -1,4 +1,5 @@
-# Host-side development only. Nothing here is installed on the device --
-# device libraries (adafruit_hid, neopixel, adafruit_pixelbuf) come from circup.
-pytest==8.3.4
+# Host-side development. Nothing here is installed on the device -- the device libraries
+# (adafruit_hid, neopixel, adafruit_pixelbuf) are installed onto the board by circup.
+-r requirements-test.txt
+
 circup==2.1.0

@@ -1,0 +1,44 @@
+{
+  "name": "meetings",
+  "dwell_ms": 1200,
+  "tap_max_ms": 250,
+  "overflow": "clamp",
+  "ext_count": 8,
+  "brightness": 100,
+  "idle_mode": "solid",
+  "idle_color": "#0A0A14",
+  "tap": {
+    "color": "#FFFFFF",
+    "steps": [
+      { "consumer": "MUTE" }
+    ]
+  },
+  "slots": [
+    {
+      "color": "#FF0000",
+      "steps": [
+        { "text": "Sorry, I have a hard stop at the top of the hour." }
+      ]
+    },
+    {
+      "color": "#FF8000",
+      "steps": [
+        { "text": "Can you share that link?" }
+      ]
+    },
+    {
+      "color": "#00FF00",
+      "steps": [
+        { "text": "Sounds good to me." }
+      ]
+    },
+    {
+      "color": "#0060FF",
+      "steps": [
+        { "text": "Give me two minutes." },
+        { "delay_ms": 200 },
+        { "key": "ENTER" }
+      ]
+    }
+  ]
+}

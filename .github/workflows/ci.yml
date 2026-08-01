@@ -1,0 +1,108 @@
+# Tests only. This repository ships firmware that is copied to a USB drive and a CLI
+# binary -- there is no AWS stack, so there is deliberately no OIDC job, no
+# `id-token: write`, and no credential of any kind here. See deploy.md.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    name: Firmware (host tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - run: pip install -r requirements-test.txt
+
+      # Asserts, among other things, that the Python encoder reproduces
+      # tests/fixtures/default.bin and default.a85 byte for byte -- the fixtures the Go
+      # encoder generates. This is the cross-language contract.
+      - name: pytest
+        run: python -m pytest tests -q
+
+  cli:
+    name: CLI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: cli/go.sum
+
+      - name: gofmt
+        working-directory: cli
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        working-directory: cli
+        run: go vet ./...
+
+      # Fails if tests/fixtures or examples/default.json are stale relative to the
+      # encoder, which is the other half of the cross-language contract.
+      - name: go test
+        working-directory: cli
+        run: go test ./...
+
+      - name: Fixtures are committed, not just generated
+        run: |
+          if ! git diff --quiet -- tests/fixtures examples; then
+            echo "Generated fixtures differ from what is committed:"
+            git --no-pager diff --stat -- tests/fixtures examples
+            echo "Run: cd cli && go test ./... -update"
+            exit 1
+          fi
+
+  cross-compile:
+    name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: windows, goarch: amd64 }
+          - { goos: windows, goarch: arm64 }
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: cli/go.sum
+
+      # CGO_ENABLED=0 is what makes one machine able to build every target. On macOS that
+      # selects the port-listing fallback in internal/device/ports_basic.go.
+      - name: Build
+        working-directory: cli
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build ./...

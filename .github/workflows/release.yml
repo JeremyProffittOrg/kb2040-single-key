@@ -1,0 +1,72 @@
+# Publishes kb2040ctl binaries for a v* tag.
+#
+# `contents: write` is needed to create the release; GITHUB_TOKEN is the only credential
+# involved. Nothing here touches AWS, so there is no OIDC role to assume. See deploy.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: cli/go.sum
+
+      # Never publish a binary that has not passed its tests.
+      - name: Test
+        working-directory: cli
+        run: go test ./...
+
+      - name: Build every target
+        working-directory: cli
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          mkdir -p ../dist
+
+          for target in windows/amd64 windows/arm64 linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            name="kb2040ctl_${version}_${os}_${arch}"
+            out="../dist/${name}"
+            if [ "$os" = "windows" ]; then
+              out="${out}.exe"
+            fi
+            echo "building ${out}"
+            GOOS="$os" GOARCH="$arch" go build \
+              -trimpath \
+              -ldflags "-s -w -X main.Version=${version}" \
+              -o "$out" ./cmd/kb2040ctl
+          done
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --notes "
+          Static \`kb2040ctl\` binaries. Download the one for your machine, make it
+          executable, and run \`kb2040ctl info\` with the board plugged in.
+
+          The firmware itself is not in this release - copy \`src/\` onto the board's
+          CIRCUITPY drive with \`scripts/flash.ps1\`, or by hand." \
+            dist/*

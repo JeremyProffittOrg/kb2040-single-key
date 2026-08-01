@@ -1,0 +1,50 @@
+{
+  "name": "dev",
+  "dwell_ms": 800,
+  "tap_max_ms": 200,
+  "overflow": "wrap_cancel",
+  "ext_count": 8,
+  "brightness": 80,
+  "idle_mode": "breathe",
+  "idle_color": "#001408",
+  "tap": {
+    "color": "#FFFFFF",
+    "steps": [
+      { "key": "S", "mods": ["CTRL"] }
+    ]
+  },
+  "slots": [
+    {
+      "color": "#00FF00",
+      "steps": [
+        { "key": "F5" }
+      ]
+    },
+    {
+      "color": "#FFC000",
+      "steps": [
+        { "key": "F9" }
+      ]
+    },
+    {
+      "color": "#FF0000",
+      "steps": [
+        { "key": "F5", "mods": ["SHIFT"] }
+      ]
+    },
+    {
+      "color": "#0060FF",
+      "steps": [
+        { "key": "GRAVE_ACCENT", "mods": ["CTRL"] },
+        { "delay_ms": 120 },
+        { "text": "go test ./...\n" }
+      ]
+    },
+    {
+      "color": "#8000FF",
+      "steps": [
+        { "key": "P", "mods": ["CTRL", "SHIFT"] }
+      ]
+    }
+  ]
+}

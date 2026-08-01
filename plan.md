@@ -361,3 +361,27 @@ verification actually returned.
   amd64/arm64). `kb2040ctl validate examples/default.json` exits 0 and reports
   `183 / 4096 bytes (3913 free)`.
 
+### 2026-08-01 — WS-D and WS-E complete (CI, docs, tooling)
+
+- `.github/workflows/ci.yml`: three jobs on push to `main` and on PRs — `firmware`
+  (pytest), `cli` (gofmt, go vet, go test, plus a check that the generated fixtures match
+  what is committed), and a six-target `cross-compile` matrix with `CGO_ENABLED=0`.
+  **Top-level `permissions: contents: read`; no AWS credentials, no OIDC, no `id-token`.**
+- `.github/workflows/release.yml`: on a `v*` tag, runs the tests, builds all six targets
+  with `-trimpath -ldflags "-s -w -X main.Version=<tag>"`, writes `SHA256SUMS`, and publishes
+  with `gh release create --generate-notes`. `contents: write` + `GITHUB_TOKEN` only; no
+  secret needs adding.
+- `requirements-test.txt` split out of `requirements-dev.txt` so CI installs pytest alone
+  and does not drag in `circup`.
+- `scripts/flash.ps1`: finds the CIRCUITPY volume, refuses to run without one, verifies
+  `boot_out.txt`, installs the libraries with circup, and mirrors `src/` — deleting
+  `singlekey/` first so a module removed from the repo cannot linger on the board.
+- `README.md`: wiring table and diagram, the colour-tap timing diagram, all three overflow
+  modes, power and 3.3V-data caveats, the full command reference, the config schema, the
+  byte budget, and troubleshooting.
+- `examples/dev-hotkeys.json` (91 bytes) and `examples/meetings.json` (183 bytes), both
+  verified with `kb2040ctl validate -p`.
+- **DoD met:** `cli/cmd/kb2040ctl/readme_test.go` asserts the README's command reference and
+  the CLI's registered commands match in both directions — a missing entry and an invented
+  one both fail.
+
