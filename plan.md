@@ -491,3 +491,32 @@ keeps the cross-language golden vector covering all four step types. 204 / 4096 
   manual that silently omits it.
 - PDF emailed to the operator via SES from an `@jeremy.ninja` sender.
 
+### 2026-08-01 — manual and tooling made cross-platform
+
+The manual and the flashing story were Windows-shaped. Corrected:
+
+- `docs/manual.md` grew an **Installing** chapter covering all three platforms: release
+  asset per target, Windows SmartScreen / `Unblock-File`, macOS Gatekeeper quarantine
+  (`xattr -d com.apple.quarantine`), and Linux serial permissions (`dialout`/`uucp`, plus a
+  udev rule scoped to vendor `239a` that also sets `ID_MM_DEVICE_IGNORE`).
+- "Finding the board" now documents port naming per platform (`COMn`,
+  `/dev/cu.usbmodem*`, `/dev/ttyACM*`), and `ports` shows example output on each.
+- Troubleshooting split into "any platform", Windows, macOS and Linux sections. The Linux
+  ones cover the two genuine blockers: group permissions, and ModemManager holding
+  `/dev/ttyACM*` for several seconds after plug-in.
+- Noted that keystrokes are HID usage codes, so what a key produces depends on the host's
+  layout, and that `WIN`/`CMD` are aliases for the same `GUI` modifier bit.
+- 13 → **18 pages**.
+
+**`scripts/flash.sh`** added — the macOS/Linux counterpart of `flash.ps1`. Finds CIRCUITPY
+under `/Volumes`, `/media/$USER`, `/run/media/$USER`, `/media` or `/mnt`, takes `--drive` for
+anything else, verifies `boot_out.txt`, installs libraries with circup, mirrors `src/`
+(removing `singlekey/` first so a deleted module cannot linger), and `sync`s before
+reporting success. Without it, Mac and Linux users had no way to flash at all.
+
+**macOS port-selection bug fixed** in `internal/device/ports_basic.go` (the cgo-less build).
+It now skips `/dev/tty.*` in favour of the `/dev/cu.*` twin — opening the tty variant of a
+callout device blocks until carrier detect, which a USB CDC port never asserts, so autodetect
+would have hung on macOS. Bluetooth ports are skipped and `usbmodem`/`usbserial` names are
+tried first. All six targets still build with `CGO_ENABLED=0`.
+

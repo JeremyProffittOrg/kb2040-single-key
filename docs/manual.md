@@ -10,10 +10,15 @@ version: 0.1.0
 switch and a chain of WS2812 RGB LEDs, which enumerates as a USB keyboard *and* a second USB
 serial port used only for configuration.
 
-This manual covers the CLI. The binary format and serial protocol are specified separately
-in `docs/format.md`; the hardware, wiring and firmware are covered in `README.md`.
+The tool runs on **Windows, macOS and Linux**, on both x86-64 and arm64. It is a single
+static binary with no runtime to install. Where the three platforms genuinely differ — how
+serial ports are named, what permissions are needed, how a downloaded binary is unblocked —
+this manual says so; everywhere else the commands are identical.
 
-Everything here was verified against an Adafruit KB2040 running CircuitPython 10.2.1.
+The binary format and serial protocol are specified separately in `docs/format.md`; the
+hardware, wiring and firmware are covered in `README.md`.
+
+Verified against an Adafruit KB2040 running CircuitPython 10.2.1.
 
 # The colour tap, in one page
 
@@ -83,6 +88,111 @@ colour slot types the name of the colour it is showing:
 **Profile 1, `media`** is play/pause on tap, with mute, volume and track controls on the
 colour slots, and a final slot that screenshots, waits, and pastes.
 
+# Installing
+
+Download the binary for your platform from the releases page, or build from source. There is
+no runtime dependency either way.
+
+| Platform | Release asset |
+|---|---|
+| Windows (Intel/AMD) | `kb2040ctl_<version>_windows_amd64.exe` |
+| Windows (Arm) | `kb2040ctl_<version>_windows_arm64.exe` |
+| macOS (Apple silicon) | `kb2040ctl_<version>_darwin_arm64` |
+| macOS (Intel) | `kb2040ctl_<version>_darwin_amd64` |
+| Linux (Intel/AMD) | `kb2040ctl_<version>_linux_amd64` |
+| Linux (Arm, e.g. Raspberry Pi) | `kb2040ctl_<version>_linux_arm64` |
+
+`SHA256SUMS` is published alongside them.
+
+## Windows
+
+Rename the download to `kb2040ctl.exe` and put it somewhere on your `PATH`. Nothing else is
+required: Windows 10 and 11 bind USB CDC devices to the built-in `usbser.sys` driver, so the
+board needs no driver install.
+
+SmartScreen may warn that the publisher is unknown, because the binary is not code-signed.
+Choose *More info* → *Run anyway*, or unblock it once in PowerShell:
+
+```powershell
+Unblock-File .\kb2040ctl.exe
+```
+
+## macOS
+
+Make it executable, and clear the quarantine flag that Gatekeeper puts on anything
+downloaded from a browser:
+
+```bash
+chmod +x kb2040ctl_0.1.0_darwin_arm64
+xattr -d com.apple.quarantine kb2040ctl_0.1.0_darwin_arm64
+sudo mv kb2040ctl_0.1.0_darwin_arm64 /usr/local/bin/kb2040ctl
+```
+
+Without the `xattr` step macOS refuses to run it — *"cannot be opened because the developer
+cannot be verified"*. No driver or extension is needed; serial access requires no special
+permission.
+
+## Linux
+
+```bash
+chmod +x kb2040ctl_0.1.0_linux_amd64
+sudo mv kb2040ctl_0.1.0_linux_amd64 /usr/local/bin/kb2040ctl
+```
+
+**Serial port permissions are the one extra step.** On most distributions `/dev/ttyACM*` is
+owned by root and the `dialout` group, so a normal user gets *permission denied* until they
+join it:
+
+```bash
+sudo usermod -aG dialout "$USER"      # Debian, Ubuntu, Raspberry Pi OS
+sudo usermod -aG uucp "$USER"         # Arch, and some Fedora setups
+```
+
+Log out and back in for the new group to apply — `newgrp dialout` works for the current
+shell in the meantime. Check with `groups`.
+
+If you would rather not add a group membership, a udev rule scoped to Adafruit's vendor ID
+does the same job and also stops ModemManager from interfering (see *Troubleshooting*):
+
+```
+# /etc/udev/rules.d/99-kb2040.rules
+SUBSYSTEM=="tty", ATTRS{idVendor}=="239a", MODE="0660", GROUP="plugdev", \
+  ENV{ID_MM_DEVICE_IGNORE}="1"
+```
+
+```bash
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+## Building from source
+
+Requires Go 1.24 or newer. No cgo, so cross-compiling needs nothing beyond the toolchain:
+
+```bash
+go build -o kb2040ctl ./cli/cmd/kb2040ctl
+```
+
+On macOS a native build (cgo enabled by default) additionally reads USB descriptors through
+IOKit, so `kb2040ctl ports` can show vendor and product IDs. The released macOS binaries are
+built without cgo and show port names only; this affects the display, not the ability to
+find the board.
+
+## Getting the firmware onto the board
+
+Covered fully in `README.md`. In short, once the board mounts as `CIRCUITPY`:
+
+```powershell
+pwsh scripts/flash.ps1        # Windows
+```
+
+```bash
+scripts/flash.sh              # macOS and Linux
+```
+
+Both install the CircuitPython libraries with `circup` and copy `src/` onto the board. Then
+**unplug and replug** — `boot.py` only takes effect on a hard reset, and it is what creates
+the configuration serial port.
+
 # Using the CLI
 
 ## Synopsis
@@ -98,12 +208,13 @@ command's flags.
 
 Every command that talks to the board accepts `-port`:
 
-```
-kb2040ctl info -port COM28
-kb2040ctl info -port /dev/ttyACM1
+```bash
+kb2040ctl info -port COM28                    # Windows
+kb2040ctl info -port /dev/cu.usbmodem1101     # macOS
+kb2040ctl info -port /dev/ttyACM1             # Linux
 ```
 
-Without it, the board is found by **probing**: each USB serial port is asked for its
+Without it, the board is found by **probing**: each candidate serial port is asked for its
 version, and the one that answers is the board.
 
 This is deliberate rather than matching a USB ID. The board exposes *two* CDC ports — the
@@ -111,8 +222,21 @@ CircuitPython REPL console and the configuration port — with identical vendor 
 IDs. Only the second answers this protocol, so the ID cannot tell them apart. Probing also
 means a board with customised USB identification still works.
 
-Only USB ports are probed. Opening an idle Bluetooth serial port can block for minutes, and
-the board is always USB CDC.
+### What the two ports look like
+
+| Platform | Typical names | Notes |
+|---|---|---|
+| Windows | `COM27`, `COM28` | numbers are assigned by Windows and are not predictable |
+| macOS | `/dev/cu.usbmodem1101`, `/dev/cu.usbmodem1103` | use the `cu.` names, never `tty.` |
+| Linux | `/dev/ttyACM0`, `/dev/ttyACM1` | numbering depends on what else is plugged in |
+
+Of each pair the lower is normally the REPL console and the higher the configuration port,
+but do not rely on it — `kb2040ctl ports` marks the right one.
+
+On macOS, only `/dev/cu.*` ports are considered. Opening the `/dev/tty.*` twin of a callout
+device blocks until carrier detect is asserted, which never happens for a USB CDC port, so
+probing it would hang. Bluetooth ports are skipped on every platform for the same class of
+reason — on Windows, opening an idle Bluetooth serial port can block for minutes.
 
 ## Exit status
 
@@ -123,7 +247,8 @@ the board is always USB CDC.
 | 2 | the command was not recognised, or its arguments were wrong |
 
 Machine-readable output (`download`, `get`) goes to standard output; progress and
-diagnostics go to standard error, so `kb2040ctl download > config.json` is safe.
+diagnostics go to standard error, so `kb2040ctl download > config.json` is safe on every
+platform.
 
 # Commands
 
@@ -136,14 +261,25 @@ kb2040ctl ports
 Lists every serial port and marks the board with `->`.
 
 ```console
-$ kb2040ctl ports
+$ kb2040ctl ports                     # Windows
    COM27        USB Serial Device (COM27)  [USB 239A:8106]
 -> COM28        USB Serial Device (COM28)  [USB 239A:8106]
    COM3         Standard Serial over Bluetooth link (COM3)
 ```
 
-If no board answers, the reason is printed after the list. On macOS builds without cgo, USB
-metadata is unavailable and only port names are shown; identification is unaffected.
+```console
+$ kb2040ctl ports                     # Linux
+   /dev/ttyACM0   KB2040 Single Key  [USB 239a:8106]
+-> /dev/ttyACM1   KB2040 Single Key  [USB 239a:8106]
+```
+
+```console
+$ kb2040ctl ports                     # macOS (released build, no cgo)
+   /dev/cu.usbmodem1101   (no product name)
+-> /dev/cu.usbmodem1103   (no product name)
+```
+
+If no board answers, the reason is printed after the list.
 
 ## info
 
@@ -269,6 +405,9 @@ is rejected. Lists and objects are given as JSON:
 ```console
 $ kb2040ctl set profiles.0.tap.steps '[{"key":"F5"},{"delay_ms":50}]'
 ```
+
+In PowerShell, single quotes work the same way; `cmd.exe` needs double quotes with the inner
+ones escaped, so a JSON value is easier from PowerShell.
 
 Errors name what is available:
 
@@ -413,6 +552,8 @@ Prints the tool's own version.
 }
 ```
 
+Files are plain UTF-8 JSON and move between platforms unchanged; line endings do not matter.
+
 ## Profile fields
 
 | Field | Range | Meaning |
@@ -441,12 +582,18 @@ A binding is `{ "color": "#RRGGBB", "steps": [ … ] }`. A step sets **exactly o
 | `consumer` | name | Consumer Control usage |
 | `delay_ms` | 0–10000 | wait |
 
-`mods` accompanies `key` only and accepts `CTRL`, `SHIFT`, `ALT`, `GUI` (also `WIN`, `CMD`),
-and the `R`-prefixed right-hand forms. Run `kb2040ctl keys` for key names and
-`kb2040ctl keys media` for media names. An unrecognised name is rejected with a list of
-valid ones. A numeric form such as `0x68` is also accepted for a raw HID usage ID.
+`mods` accompanies `key` only and accepts `CTRL`, `SHIFT`, `ALT`, `GUI`, and the
+`R`-prefixed right-hand forms. `WIN` and `CMD` are accepted as aliases for `GUI`, which is
+the same HID modifier bit on every platform — the host decides what it means. Run
+`kb2040ctl keys` for key names and `kb2040ctl keys media` for media names. An unrecognised
+name is rejected with a list of valid ones. A numeric form such as `0x68` is also accepted
+for a raw HID usage ID.
 
 Up to 64 steps per binding.
+
+Keystrokes are sent as HID usage codes, so what a key produces depends on the **host's**
+keyboard layout. Text steps are typed via a US layout; on a host set to another layout,
+punctuation in a text step may not come out as written.
 
 ## The byte budget
 
@@ -463,9 +610,11 @@ anything is sent.
 
 # Troubleshooting
 
+## Any platform
+
 **`no kb2040-single-key found`.** Either the board is not running this firmware, or another
-program already holds the port — a serial monitor, or the Mu editor. Close it, or pass
-`-port` explicitly.
+program already holds the port — a serial monitor, the Mu editor, the Arduino IDE. Close it,
+or pass `-port` explicitly.
 
 **Only one serial port appears.** `boot.py` has not run. It takes effect only on a *hard*
 reset: unplug and replug, or press the reset button. A soft reload is not enough.
@@ -483,3 +632,58 @@ raise `tap_max_ms`.
 
 **Nothing at all on the LEDs at startup.** The firmware is not running. Check the REPL on the
 *console* serial port for a traceback — a missing library is the usual cause.
+
+## Windows
+
+**SmartScreen blocks the binary.** It is not code-signed. *More info* → *Run anyway*, or
+`Unblock-File .\kb2040ctl.exe`.
+
+**A command hangs for a long time.** Older builds probed every serial port, including
+Bluetooth ones, which can block for minutes. Current builds probe only USB ports; if you are
+on an older binary, pass `-port` explicitly.
+
+## macOS
+
+**"cannot be opened because the developer cannot be verified".** Gatekeeper quarantine.
+Clear it with `xattr -d com.apple.quarantine ./kb2040ctl`.
+
+**`permission denied` when running it.** Missing the executable bit: `chmod +x ./kb2040ctl`.
+
+**A command hangs.** Check you are not pointing `-port` at a `/dev/tty.*` name. Use the
+`/dev/cu.*` twin; the `tty.` variant waits for carrier detect that a USB CDC port never
+asserts. Autodetect already avoids them.
+
+**`ports` shows no vendor or product IDs.** Expected on the released macOS binaries, which
+are built without cgo and so cannot read USB descriptors. Identification is unaffected.
+Build from source natively if you want the IDs.
+
+## Linux
+
+**`permission denied` opening `/dev/ttyACM1`.** Your user is not in the port's group. Add
+yourself to `dialout` (Debian, Ubuntu, Raspberry Pi OS) or `uucp` (Arch, some Fedora), then
+log out and back in:
+
+```bash
+sudo usermod -aG dialout "$USER"
+```
+
+Confirm with `groups`, and check the port's owner with `ls -l /dev/ttyACM*`.
+
+**The first command after plugging in fails, then it works.** ModemManager probes new
+`/dev/ttyACM*` devices for a few seconds, assuming they might be a cellular modem, and holds
+the port while it does. Install the udev rule in *Installing → Linux* to exempt the board,
+or if you have no modems at all:
+
+```bash
+sudo systemctl mask ModemManager
+```
+
+**No `CIRCUITPY` volume when flashing.** Many minimal or headless installs do not automount
+removable media. Find it with `lsblk -o NAME,LABEL,MOUNTPOINT`, mount it, and pass the path:
+
+```bash
+scripts/flash.sh --drive /mnt/CIRCUITPY
+```
+
+**`kb2040ctl: command not found` after moving it to `/usr/local/bin`.** That directory is on
+the default `PATH` on most distributions but not all; check with `echo $PATH`.

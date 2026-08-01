@@ -153,10 +153,17 @@ onto `RPI-RP2`. The board reboots as `CIRCUITPY`.
 
 ```powershell
 pip install -r requirements-dev.txt
-pwsh scripts/flash.ps1
+pwsh scripts/flash.ps1          # Windows
 ```
 
-This installs the CircuitPython libraries with `circup` and copies `src/` onto the drive.
+```bash
+pip install -r requirements-dev.txt
+scripts/flash.sh                # macOS and Linux
+```
+
+Both install the CircuitPython libraries with `circup` and copy `src/` onto the drive. If the
+volume is mounted somewhere unusual — common on headless Linux, which may not automount at
+all — pass it explicitly: `scripts/flash.sh --drive /mnt/CIRCUITPY`.
 Then **unplug and replug the board** — `boot.py` only takes effect on a hard reset, and it
 is what creates the second serial port.
 
@@ -173,8 +180,14 @@ anything can talk to it.
 go build -o kb2040ctl ./cli/cmd/kb2040ctl
 ```
 
-Or download a prebuilt binary from the releases page — Windows, Linux and macOS, amd64 and
+Or download a prebuilt binary from the releases page — Windows, macOS and Linux, amd64 and
 arm64, no runtime to install.
+
+Two per-platform notes, both covered in the [manual](docs/kb2040ctl-manual.pdf): macOS
+quarantines a downloaded binary, so clear it with
+`xattr -d com.apple.quarantine ./kb2040ctl`; and on Linux `/dev/ttyACM*` belongs to the
+`dialout` group, so `sudo usermod -aG dialout "$USER"` (then log out and in) avoids
+*permission denied*.
 
 ### 4. Check it
 
@@ -193,9 +206,12 @@ storage    204 / 4096 bytes used (3892 free)
   1  media            6 slots, 1000ms dwell, wrap_cancel overflow, 8 LEDs
 ```
 
-Two ports appear because the board exposes both the REPL console and the config port. They
-have identical USB IDs, so `kb2040ctl` finds the right one by asking each until one answers.
-Only USB ports are probed — opening an idle Bluetooth serial port can block for minutes.
+Two ports appear because the board exposes both the REPL console and the config port
+(`COM27`/`COM28` on Windows, `/dev/ttyACM0`/`/dev/ttyACM1` on Linux, `/dev/cu.usbmodem*` on
+macOS). They have identical USB IDs, so `kb2040ctl` finds the right one by asking each until
+one answers. Bluetooth ports are never probed — opening an idle one on Windows can block for
+minutes — and on macOS only the `/dev/cu.*` names are tried, since opening a `/dev/tty.*`
+twin waits forever for carrier detect.
 
 ---
 
@@ -371,6 +387,12 @@ the number of pixels you attached. `kb2040ctl set profiles.0.ext_count 8`.
 python -m pytest tests -q     # firmware logic - no hardware needed
 go test ./cli/...             # CLI and wire format
 go vet ./cli/...
+```
+
+The manual is built from [`docs/manual.md`](docs/manual.md):
+
+```bash
+python scripts/build-manual.py    # -> docs/kb2040ctl-manual.pdf
 ```
 
 Everything under `src/singlekey/` deliberately imports nothing from CircuitPython, so the
