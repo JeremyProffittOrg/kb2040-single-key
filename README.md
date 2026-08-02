@@ -2,13 +2,152 @@
 
 One key. Many actions. The colour tells you which one.
 
-An [Adafruit KB2040](https://www.adafruit.com/product/5302) with a single mechanical switch
-and a few WS2812 RGB LEDs, which enumerates as a USB keyboard **and** a second USB serial
-port used only for configuration. Configuration lives on the board, survives a power cycle,
-and is edited with a cross-platform CLI.
+An [Adafruit KB2040](https://www.adafruit.com/product/5302) with a single **Kailh Big Switch**
+and a [NeoPixel Jewel](https://www.adafruit.com/product/2859) under (or beside) it, which
+enumerates as a USB keyboard **and** a second USB serial port used only for configuration.
+Configuration lives on the board, survives a power cycle, and is edited with a
+cross-platform CLI.
 
-Verified on an Adafruit KB2040 running **CircuitPython 10.2.1**, with an eight-pixel WS2812B
-chain. A full command reference is in [`docs/kb2040ctl-manual.pdf`](docs/kb2040ctl-manual.pdf).
+Verified on an Adafruit KB2040 running **CircuitPython 10.2.1**. The default profile expects
+an eight-pixel chain; with a 7-LED Jewel set `ext_count` to `7` (see
+[Build guide](#build-guide)). A full command reference is in
+[`docs/kb2040ctl-manual.pdf`](docs/kb2040ctl-manual.pdf).
+
+| Core parts | Link |
+|---|---|
+| Controller | [Adafruit KB2040 — RP2040 Kee Boar Driver](https://www.adafruit.com/product/5302) |
+| Lighting | [NeoPixel Jewel — 7 × 5050 RGB(W)](https://www.adafruit.com/product/2859) (any Jewel variant works) |
+| Switch | [Kailh Big Switches](https://www.adafruit.com/category/571) (clicky blue / tactile orange / linear yellow) |
+| Case | [`BigSwitchCase.stl`](BigSwitchCase.stl) · [`BigSwitchCase.scad`](BigSwitchCase.scad) |
+
+---
+
+## Bill of materials
+
+### Required electronics
+
+| Qty | Part | Adafruit / source | Notes |
+|---:|---|---|---|
+| 1 | **Adafruit KB2040** | [product 5302](https://www.adafruit.com/product/5302) · ~$8.95 | RP2040, Pro Micro footprint, USB-C, onboard NeoPixel |
+| 1 | **NeoPixel Jewel** (7 LEDs) | [product 2859](https://www.adafruit.com/product/2859) RGBW Natural White, or [2226](https://www.adafruit.com/product/2226) RGB | ~23 mm diameter. Firmware talks plain WS2812 data on `D10` |
+| 1 | **Kailh Big Switch** + keycap | [Big Switches category](https://www.adafruit.com/category/571) · ~$19.95 | [5307](https://www.adafruit.com/product/5307) clicky pale blue · [5306](https://www.adafruit.com/product/5306) tactile burnt orange · [5305](https://www.adafruit.com/product/5305) linear dark yellow |
+| 1 | USB-C cable | any data-capable cable | Power + HID + config serial |
+
+### Printed / mechanical
+
+| Qty | Part | File | Notes |
+|---:|---|---|---|
+| 1 | **Big Switch case (base)** | [`BigSwitchCase.stl`](BigSwitchCase.stl) | Outer envelope ≈ **84 × 84 × 65 mm**. Print with the flat base on the bed |
+| — | OpenSCAD source | [`BigSwitchCase.scad`](BigSwitchCase.scad) | Mesh polyhedron of the same solid (for inspection / remix) |
+
+Optional: a thin diffuser disk or clear plate under the keycap if you want the Jewel to glow through the switch housing; the stock Kailh Big keycap is opaque, so many builds mount the Jewel in the base looking upward around the switch, or light the desk from under a translucent base.
+
+### Consumables / tools
+
+| Item | Why |
+|---|---|
+| Hookup wire (or short pre-crimped jumpers) | Switch to `D4`/`GND`; Jewel `DIN`/`5V`/`GND` to `D10`/`RAW`/`GND` |
+| Soldering iron + solder | Headers (if used), switch legs, Jewel pads |
+| Flux / flush cutters | Clean joints |
+| Small flat screwdriver | **Required to release the Big Switch from the case** — see diagram below |
+| 3D printer + filament | PLA or PETG for the case |
+
+Rough electronics total (one of each, USD list prices): **≈ $35–40** before shipping, cable, and filament.
+
+---
+
+## Case: tab-release openings
+
+The Big Switch snaps into the printed base. It is **not** meant to be pried out by the keycap.
+On opposite sides of the case there are **square openings**. Through each opening you can reach
+a plastic **retention tab** on the switch body.
+
+1. Insert a **small flat screwdriver** into the square opening on one side.
+2. Push **inward** on the tab (toward the centre of the switch).
+3. Repeat on the **opposite** opening.
+4. Lift the switch **straight up** out of the base.
+
+![BigSwitchCase tab-release openings — top and side views](docs/images/big-switch-case-release.svg)
+
+> Do not force the housing. If a tab is still caught, go back to that side and push again
+> while lifting gently. Forcing the keycap can crack the stem or the printed wall.
+
+---
+
+## Build guide
+
+### 1. Print the case
+
+- Slice [`BigSwitchCase.stl`](BigSwitchCase.stl) (or render [`BigSwitchCase.scad`](BigSwitchCase.scad)).
+- Orientation: **flat base on the bed**, openings vertical.
+- Suggested start: 0.2 mm layers, 15–20% infill, 3 walls. Supports usually unnecessary if
+  printed base-down; enable them only if your slicer flags the openings.
+- After printing, clean the two **square side openings** with a knife or small file so a
+  screwdriver blade enters cleanly.
+
+### 2. Fit-check the switch (no solder yet)
+
+1. Align the Kailh Big Switch with the cavity (legs/orientation as your wiring prefers —
+   note which side the two electrical pins face).
+2. Press the switch straight down until both tabs click.
+3. Practice the **tab release** with the screwdriver through both square openings so you are
+   comfortable removing it before anything is wired.
+
+### 3. Wire the electronics
+
+Follow the [Wiring](#wiring) table. Short summary for this build:
+
+| Connection | From | To |
+|---|---|---|
+| Switch contact A | Big Switch pin 1 | KB2040 **`D4`** |
+| Switch contact B | Big Switch pin 2 | KB2040 **`GND`** |
+| LED data | Jewel **`DIN`** (or `In`) | KB2040 **`D10`** |
+| LED power | Jewel **`+` / 5V** | KB2040 **`RAW`** (USB 5 V) |
+| LED ground | Jewel **`–` / GND** | KB2040 **`GND`** |
+
+```
+   KB2040                         NeoPixel Jewel (7)
+   ------                         ------------------
+   D10  ------------------------>  DIN
+   RAW  ------------------------>  +5V
+   GND  ------------------------>  GND
+
+   D4   ---[ Kailh Big Switch ]--- GND
+```
+
+**Tips**
+
+- Solder the Jewel first if it will sit under the switch — access is harder later.
+- Keep the data wire short. If colours glitch, see the [power / 3.3 V data notes](#wiring).
+- The onboard NeoPixel needs no wiring; it mirrors status on its own.
+- Leave USB-C and the BOOT/RESET buttons accessible (side cutout or open base).
+
+### 4. Install into the case
+
+1. Seat the Jewel (and any diffuser) in the base.
+2. Route wires so they do not block a tab or the square openings.
+3. Snap the Big Switch in until both tabs catch.
+4. Mount or tape the KB2040 in the base (or in a side pocket if you remix the case). USB-C
+   should face an opening so the cable does not stress the board.
+
+### 5. Flash firmware and set LED count
+
+1. Install CircuitPython and flash this firmware — [Getting started](#getting-started).
+2. For a **7-LED Jewel**, set the external chain length (per active profile):
+
+```bash
+kb2040ctl set profiles.0.ext_count 7
+kb2040ctl set profiles.1.ext_count 7   # if you use profile 1 as well
+```
+
+3. Unplug/replug. On boot you should see the **rainbow sweep** on the onboard pixel and all
+   seven Jewel LEDs. Then try a tap and a colour-hold ([The colour tap](#the-colour-tap)).
+
+### 6. Removing the switch later
+
+Use the square openings and a small screwdriver as in
+[Case: tab-release openings](#case-tab-release-openings). Pull the switch only after **both**
+tabs are free.
 
 ---
 
@@ -95,16 +234,21 @@ slots — switch to it with `kb2040ctl profile use 1`.
 
 ## Wiring
 
+Reference hardware for this repo is the **KB2040 + Kailh Big Switch + NeoPixel Jewel**
+build described in the [Bill of materials](#bill-of-materials) and
+[Build guide](#build-guide). Any momentary switch to ground and any WS2812-compatible chain
+on `D10` will work the same electrically.
+
 | Function | Pin | Notes |
 |---|---|---|
-| Key switch | `D4` (GP4) | other leg to `GND`. Internal pull-up, active low — no resistor needed. |
+| Key switch (Kailh Big Switch) | `D4` (GP4) | other leg to `GND`. Internal pull-up, active low — no resistor needed. |
 | Onboard NeoPixel | `NEOPIXEL` (GP17) | already on the board, nothing to wire |
-| External WS2812 data | `D10` (GP10) | first pixel's `DIN` |
+| External WS2812 data (Jewel `DIN`) | `D10` (GP10) | first pixel's `DIN` |
 | External WS2812 power | `RAW` (5 V) and `GND` | see the power note below |
 
 ```
-   KB2040                      WS2812 chain
-   ------                      ------------
+   KB2040                      WS2812 chain / NeoPixel Jewel
+   ------                      -----------------------------
    D10  --------------------->  DIN
    RAW  --------------------->  5V
    GND  --------------------->  GND
@@ -114,8 +258,8 @@ slots — switch to it with `kb2040ctl profile use 1`.
 
 **Power.** A WS2812 draws up to ~60 mA at full white. `RAW` comes straight from USB VBUS, so
 the practical ceiling is what the host port will give — budget roughly 8–10 pixels before
-adding a separate 5 V supply (tie its ground to the board's). The default `brightness` of 64
-keeps a chain of 8 to about a fifth of that draw.
+adding a separate 5 V supply (tie its ground to the board's). A 7-LED Jewel is well inside
+that. The default `brightness` of 64 keeps a chain of 7–8 to about a fifth of full-white draw.
 
 **3.3 V data into a 5 V part.** The RP2040's output is 3.3 V and WS2812 datasheets ask for
 0.7 × VDD. It usually works at short distances, and reliably if you power the chain at
