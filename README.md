@@ -2,6 +2,17 @@
 
 One key. Many actions. The colour tells you which one.
 
+[![Colour-tap demo — hold blue→yellow→green types green; hold green→orange→red types red](docs/images/demo-hero.jpg)](videos/demo.mp4)
+
+<p align="center">
+  <a href="videos/demo.mp4"><strong>▶ Watch demo.mp4</strong></a>
+  · hold through colours, release to type
+</p>
+
+<video src="videos/demo.mp4" controls playsinline preload="metadata" width="100%">
+  <a href="videos/demo.mp4">Watch the colour-tap demo</a>
+</video>
+
 An [Adafruit KB2040](https://www.adafruit.com/product/5302) with a single **Kailh Big Switch**
 and a [NeoPixel Jewel](https://www.adafruit.com/product/2859) under (or beside) it, which
 enumerates as a USB keyboard **and** a second USB serial port used only for configuration.
