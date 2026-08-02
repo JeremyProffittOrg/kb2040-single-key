@@ -2,12 +2,7 @@
 
 One key. Many actions. The colour tells you which one.
 
-![Colour-tap demo: hold blue→yellow→green types green; hold green→orange→red types red](docs/images/demo.gif)
-
-<p align="center">
-  <a href="videos/demo.mp4"><strong>▶ Full-quality demo.mp4</strong></a>
-  · hold through colours, release to type
-</p>
+https://github.com/user-attachments/assets/0918dcb5-c18a-48c0-b888-711ede7c37b0
 
 An [Adafruit KB2040](https://www.adafruit.com/product/5302) with a single **Kailh Big Switch**
 and a [NeoPixel Jewel](https://www.adafruit.com/product/2859) under (or beside) it, which
