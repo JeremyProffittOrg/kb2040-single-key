@@ -29,6 +29,12 @@ const DefaultTimeout = 3 * time.Second
 // drainWindow bounds how long resynchronisation will spend swallowing stale output.
 const drainWindow = 500 * time.Millisecond
 
+// probeTimeout bounds the first autodetect pass. A board answers the handshake in
+// milliseconds, so waiting DefaultTimeout on each candidate just to rule out the REPL
+// console port made every autodetected command cost several seconds. See autodetectFrom for
+// why there is still a slow pass.
+const probeTimeout = 500 * time.Millisecond
+
 // Conn is an open connection to a board.
 //
 // The transport is an io.ReadWriteCloser rather than a serial.Port so the protocol client
@@ -112,7 +118,7 @@ func Autodetect() (*Conn, error) {
 		return nil, fmt.Errorf("no serial ports found; is the board plugged in?")
 	}
 
-	var tried []string
+	var candidates []string
 	for _, p := range ports {
 		// Never open a non-USB port. The board is always USB CDC, and opening an idle
 		// Bluetooth serial port can block for minutes -- probing them turned autodetect
@@ -120,20 +126,46 @@ func Autodetect() (*Conn, error) {
 		if portsHaveUSBMetadata && !p.IsUSB {
 			continue
 		}
-		tried = append(tried, p.Name)
-		c, err := open(p.Name)
-		if err != nil {
-			continue // in use by something else, or not openable; not our board
-		}
-		if _, err := c.Info(); err != nil {
-			c.Close()
-			continue
-		}
+		candidates = append(candidates, p.Name)
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no USB serial ports found; is the board plugged in?")
+	}
+
+	if c := autodetectFrom(candidates, open); c != nil {
 		return c, nil
 	}
 	return nil, fmt.Errorf("no kb2040-single-key found on any of: %s\n"+
 		"(the config port is the second CDC port; if only one appeared, hard-reset the "+
-		"board so boot.py runs)", strings.Join(tried, ", "))
+		"board so boot.py runs)", strings.Join(candidates, ", "))
+}
+
+// autodetectFrom probes each candidate, quickly first and then patiently.
+//
+// The board answers in milliseconds, so the quick pass finds it almost at once, and the
+// dead ports -- above all the REPL console, which sits right next to the config port and
+// never replies -- cost a fraction of a second each instead of a full command timeout.
+// Without this, every autodetected command paid about 3.5 seconds to rule the console out.
+//
+// The slow pass exists because "no reply yet" is not proof of the wrong port: a binding
+// containing a delay step can occupy the firmware for up to ten seconds, during which the
+// real board is merely busy. Giving up after the quick pass would report no board found
+// while one is plugged in and working perfectly.
+func autodetectFrom(names []string, opener func(string) (*Conn, error)) *Conn {
+	for _, timeout := range []time.Duration{probeTimeout, DefaultTimeout} {
+		for _, name := range names {
+			c, err := opener(name)
+			if err != nil {
+				continue // in use by something else, or not openable; not our board
+			}
+			if _, err := c.infoWithin(timeout); err != nil {
+				c.Close()
+				continue
+			}
+			return c
+		}
+	}
+	return nil
 }
 
 // Connect opens the named port, or autodetects when name is empty.
@@ -227,8 +259,10 @@ func (c *Conn) readLine(deadline time.Time) (string, error) {
 }
 
 // Info runs `version` and parses the reply.
-func (c *Conn) Info() (Info, error) {
-	lines, err := c.Command("version")
+func (c *Conn) Info() (Info, error) { return c.infoWithin(DefaultTimeout) }
+
+func (c *Conn) infoWithin(timeout time.Duration) (Info, error) {
+	lines, err := c.commandTimeout("version", timeout)
 	if err != nil {
 		return Info{}, err
 	}

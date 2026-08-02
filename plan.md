@@ -520,3 +520,29 @@ callout device blocks until carrier detect, which a USB CDC port never asserts, 
 would have hung on macOS. Bluetooth ports are skipped and `usbmodem`/`usbserial` names are
 tried first. All six targets still build with `CGO_ENABLED=0`.
 
+### 2026-08-01 — autodetect made fast (measured, then fixed)
+
+Answering "does the CLI find the port automatically?" turned up a measurable wart in what
+had just shipped. Autodetect works, but it was paying the full 3-second command timeout on
+the REPL console port before falling through to the config port:
+
+    autodetect   3.98s / 3.73s / 3.60s
+    -port COM28  0.44s
+
+`autodetectFrom` now probes in two passes: 500 ms per candidate first, then the full
+`DefaultTimeout`. The quick pass finds a healthy board (which replies in milliseconds) and
+rules out dead ports cheaply; the patient pass remains because a binding with a `delay_ms`
+step can occupy the firmware for up to ten seconds, so silence is not proof of the wrong
+port. Measured after the change on the same board:
+
+    autodetect   1.44s / 1.11s / 1.09s
+
+The probe loop was extracted so it takes an opener function, and is covered by three tests
+(picks the port that answers, still finds a board that misses the quick pass, gives up when
+nothing answers) using a fake opener rather than real ports.
+
+**Process note:** two earlier `python .replace()` source edits silently no-opped because the
+search string did not match, and `go vet` passed either way because the old code was still
+valid. Caught only by a later compile error. Use the `Edit` tool for source changes — it
+fails loudly on a mismatch.
+

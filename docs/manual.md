@@ -214,13 +214,35 @@ kb2040ctl info -port /dev/cu.usbmodem1101     # macOS
 kb2040ctl info -port /dev/ttyACM1             # Linux
 ```
 
-Without it, the board is found by **probing**: each candidate serial port is asked for its
-version, and the one that answers is the board.
+**Without `-port`, every command finds the board on its own.** Each candidate serial port is
+asked for its version, and the one that answers is the board. No configuration, no saved
+state, no udev alias — plug it in and run the command.
 
 This is deliberate rather than matching a USB ID. The board exposes *two* CDC ports — the
 CircuitPython REPL console and the configuration port — with identical vendor and product
 IDs. Only the second answers this protocol, so the ID cannot tell them apart. Probing also
 means a board with customised USB identification still works.
+
+Ports are tried in a sensible order — on Windows and Linux, ones belonging to Adafruit's USB
+vendor ID first — so in practice the board is usually the first or second port opened.
+
+Scanning happens in two passes. The first gives each port half a second, which is ample
+because a healthy board replies in milliseconds; this is what keeps autodetection down to
+about a second in total rather than several. If nothing answers, a second, patient pass
+allows the full timeout, because a silent port is not proof of the wrong port — a binding
+containing a `delay_ms` step can occupy the firmware for up to ten seconds, during which the
+real board is merely busy.
+
+Autodetection costs roughly a second per command. Passing `-port` skips it and cuts that to
+about a tenth of that, which is worth doing in a script that runs many commands:
+
+```bash
+PORT=$(kb2040ctl ports | awk '/^->/ {print $2}')
+kb2040ctl -port "$PORT" info
+```
+
+Ports already held open by another program are skipped rather than waited on, so a serial
+monitor left running elsewhere slows nothing down.
 
 ### What the two ports look like
 
