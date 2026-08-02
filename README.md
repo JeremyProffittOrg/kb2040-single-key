@@ -2,7 +2,7 @@
 
 One key. Many actions. The colour tells you which one.
 
-https://github.com/user-attachments/assets/0918dcb5-c18a-48c0-b888-711ede7c37b0
+https://github.com/user-attachments/assets/82b076d7-507e-4828-8a83-83113fe58dd0
 
 An [Adafruit KB2040](https://www.adafruit.com/product/5302) with a single **Kailh Big Switch**
 and a [NeoPixel Jewel](https://www.adafruit.com/product/2859) under (or beside) it, which
