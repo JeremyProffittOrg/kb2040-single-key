@@ -104,8 +104,19 @@ $packageTarget = Join-Path $Drive 'singlekey'
 if (Test-Path $packageTarget) {
     Remove-Item -Path $packageTarget -Recurse -Force
 }
-Copy-Item -Path $packageSource -Destination $packageTarget -Recurse -Force
-Get-ChildItem -Path $packageTarget -Filter '*.py' | ForEach-Object { Write-Host "  singlekey/$($_.Name)" }
+
+# Copy the modules individually rather than with `Copy-Item -Recurse` on the directory.
+# Two reasons, both of which bite in practice on a CircuitPython volume:
+#   * if $packageTarget still exists at this point -- the FAT driver does not always retire
+#     the directory entry as promptly as Remove-Item returns -- then -Recurse copies the
+#     source *into* it and produces singlekey/singlekey, which fails on the next write.
+#   * the repo's src/singlekey/__pycache__ holds host CPython .pyc files. They are useless
+#     to CircuitPython and just consume space on a 7 MB drive.
+New-Item -ItemType Directory -Path $packageTarget -Force | Out-Null
+Get-ChildItem -Path $packageSource -Filter '*.py' -File | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination (Join-Path $packageTarget $_.Name) -Force
+    Write-Host "  singlekey/$($_.Name)"
+}
 
 Write-Host @"
 
