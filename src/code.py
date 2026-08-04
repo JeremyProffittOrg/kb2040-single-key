@@ -26,6 +26,7 @@ import usb_hid
 
 from singlekey import blob, colortap, protocol
 from singlekey.actions import ActionRunner
+from singlekey.keystate import Debouncer
 from singlekey.leds import LedEngine
 from singlekey.nvmstore import NvmStore
 from singlekey.ticks import ticks_diff
@@ -161,25 +162,25 @@ class Device:
 
 
 class KeyReader:
-    """Debounced reader for a single active-low switch."""
+    """Debounced reader for a single active-low switch.
+
+    Only the pin read lives here; the debounce itself is in ``singlekey.keystate`` so it
+    is host-testable.
+    """
 
     def __init__(self, pin):
         self.io = digitalio.DigitalInOut(pin)
         self.io.direction = digitalio.Direction.INPUT
         self.io.pull = digitalio.Pull.UP
-        self.pressed = not self.io.value
-        self._last_change = 0
+        self._debounce = Debouncer(not self.io.value, DEBOUNCE_MS)
+
+    @property
+    def pressed(self):
+        return self._debounce.pressed
 
     def poll(self, now):
         """Return True on a press edge, False on a release edge, None if nothing changed."""
-        current = not self.io.value
-        if current == self.pressed:
-            return None
-        if ticks_diff(now, self._last_change) < DEBOUNCE_MS:
-            return None
-        self._last_change = now
-        self.pressed = current
-        return current
+        return self._debounce.update(not self.io.value, now)
 
 
 class SerialLines:
