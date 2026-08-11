@@ -18,7 +18,7 @@ concurrency:
 jobs:
   firmware:
     name: Firmware (host tests)
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","home-general-linux-x64"]') }}
     steps:
       - uses: actions/checkout@v5
 
@@ -38,7 +38,7 @@ jobs:
 
   cli:
     name: CLI
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","home-general-linux-x64"]') }}
     steps:
       - uses: actions/checkout@v5
 
@@ -78,7 +78,7 @@ jobs:
 
   cross-compile:
     name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","home-general-linux-x64"]') }}
     strategy:
       fail-fast: false
       matrix:
